@@ -2,6 +2,7 @@
 Dynamic `dumphfdl` wrapper that changes listening frequencies based off of HFDL activity.
 
 ### TODO
+- [ ] Derive bands from SPDU via provided system table config instead of current shortcut.
 - [ ] Allow more `dumphfdl` command line argument passthrough
 - [ ] Allow more arguments to be configurable via environment variables
 - [ ] Use Airframes SPDU API to immediately hone into active frequencies
