@@ -2,10 +2,10 @@
 Dynamic `dumphfdl` wrapper that changes listening frequencies based off of HFDL activity.
 
 ### TODO
-[ ] Allow more `dumphfdl` command line argument passthrough
-[ ] Allow more arguments to be configurable via environment variables
-[ ] Use Airframes SPDU API to immediately hone into active frequencies
-[ ] Use "heard from" data from aircraft's HFNPDU messages
+- [ ] Allow more `dumphfdl` command line argument passthrough
+- [ ] Allow more arguments to be configurable via environment variables
+- [ ] Use Airframes SPDU API to immediately hone into active frequencies
+- [ ] Use "heard from" data from aircraft's HFNPDU messages
 
 ### Building
 First, install a stable [Rust](https://www.rust-lang.org/learn/get-started) toolchain. Make sure the `cargo` command is in `PATH` environment variable after completion. 
