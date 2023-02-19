@@ -5,6 +5,7 @@ use serde_json::Value;
 use std::io;
 use std::io::{Seek, SeekFrom, Write};
 use std::process::Stdio;
+use std::sync::Arc;
 use std::time::Duration;
 use tempfile::NamedTempFile;
 use tokio::io::{AsyncBufReadExt, BufReader};
@@ -13,7 +14,9 @@ use tokio::process::Command;
 mod args;
 mod chooser;
 mod config;
+mod hfdl;
 mod http;
+mod state;
 
 #[tokio::main]
 async fn main() -> io::Result<()> {
@@ -52,14 +55,19 @@ async fn main() -> io::Result<()> {
         }
     };
 
+    let shared_state = Arc::new(state::SharedState::new(&config));
+
     if config.swarm {
         info!("Swarm mode is ON: target={}:{}", config.host, config.port)
+
+        // TODO: what does swarm mode look like
     } else {
         info!(
             "Swarm mode is OFF: starting web server on {}:{}",
             config.host, config.port
         );
         tokio::spawn(async move {
+            // TODO: add routes
             let server = HttpServer::new(|| App::new().service(http::index))
                 .bind((config.host, config.port))
                 .unwrap()
@@ -153,7 +161,8 @@ async fn main() -> io::Result<()> {
                             }
                         };
 
-                        info!("frame: {:?}", frame);
+                        // TODO: parse HFDL frame
+
                         println!("{}", msg.trim());
 
                         if plugin.on_recv_frame(&frame) {

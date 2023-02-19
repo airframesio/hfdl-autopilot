@@ -60,8 +60,8 @@ impl<'a> ChooserPlugin for RotateChooserPlugin<'a> {
             self.band_idx = Some(self.init_band_idx);
         } else if self.switcher.eq("random") {
             info!(
-                "[rotate](random) band_idx = {:?}, recently_used = {:?}",
-                self.band_idx, self.recently_used
+                "[rotate](random) band_idx = {:?}, recently_used = {:?}, ignore_last = {}",
+                self.band_idx, self.recently_used, self.ignore_last
             );
 
             let mut new_idx = self.band_idx.unwrap();
