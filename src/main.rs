@@ -34,7 +34,7 @@ async fn main() -> io::Result<()> {
         Ok(cfg) => cfg,
         Err(e) => {
             error!("Failed to parse configuration: {}", e);
-            return Err(Error::new(ErrorKind::InvalidData, e));
+            return Ok(());
         }
     };
     info!("Configuration demarshalled from command line arguments.");
@@ -47,7 +47,7 @@ async fn main() -> io::Result<()> {
         Some(plugin) => plugin,
         None => {
             error!("Invalid plugin name: {}", name);
-            return Err(Error::new(ErrorKind::InvalidInput, "Invalid plugin name"));
+            return Ok(());
         }
     };
 
@@ -74,7 +74,7 @@ async fn main() -> io::Result<()> {
             Ok(val) => val.to_owned(),
             Err(e) => {
                 error!("Failed to choose a frequency band to listen to: {}", e);
-                return Err(Error::new(ErrorKind::InvalidData, e));
+                return Ok(());
             }
         };
 
@@ -85,10 +85,7 @@ async fn main() -> io::Result<()> {
             d if d <= 256 => "256000",
             _ => {
                 error!("Bandwidth calculation failed: {:?}", band);
-                return Err(Error::new(
-                    ErrorKind::InvalidData,
-                    format!("Bandwidth calculation invalid: {:?}", band),
-                ));
+                return Ok(());
             }
         };
 
