@@ -8,7 +8,6 @@ pub const NAME: &'static str = "rotate";
 
 pub struct RotateChooserPlugin<'a> {
     bands: &'a FrequencyBandMap,
-    props: &'a HashMap<&'a str, &'a str>,
 
     rng: ThreadRng,
 
@@ -35,7 +34,6 @@ impl<'a> RotateChooserPlugin<'a> {
 
         RotateChooserPlugin {
             bands,
-            props,
 
             rng: rand::thread_rng(),
 
