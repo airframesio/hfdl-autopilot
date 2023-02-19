@@ -7,9 +7,11 @@ import sys
 class EchoServerHandler(socketserver.BaseRequestHandler):
   def handle(self):
     data = self.request.recv(4096).decode("utf-8")
-    print(data.strip())
+    sys.stdout.write(data)
     sys.stdout.flush()
     
 if __name__ == "__main__":
+  if "--exit" in sys.argv[1 : ]:
+    sys.exit(1)
   with socketserver.TCPServer(("localhost", 9000), EchoServerHandler) as server:
     server.serve_forever()
