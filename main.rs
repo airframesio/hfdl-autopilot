@@ -1,19 +1,21 @@
-use crossbeam::channel::{after, bounded, select};
-use serde_json::Value;
-use std::io::{BufRead, BufReader, Seek, SeekFrom, Write};
-use std::process::{Command, Stdio};
-use std::thread;
-use std::time::Duration;
-use tempfile::NamedTempFile;
-
+use actix_web::rt;
 use clap::Parser;
 use log::*;
+use serde_json::Value;
+use std::io;
+use std::io::{Error, ErrorKind, Seek, SeekFrom, Write};
+use std::process::Stdio;
+use std::time::Duration;
+use tempfile::NamedTempFile;
+use tokio::io::{AsyncBufReadExt, BufReader};
+use tokio::process::Command;
 
 mod args;
 mod chooser;
 mod config;
 
-fn main() {
+#[tokio::main]
+async fn main() -> io::Result<()> {
     let args = args::Args::parse();
 
     stderrlog::new()
@@ -31,8 +33,8 @@ fn main() {
     let config = match config::Config::from_args(&args) {
         Ok(cfg) => cfg,
         Err(e) => {
-            error!("Failed to parser configuration: {}", e);
-            return;
+            error!("Failed to parse configuration: {}", e);
+            return Err(Error::new(ErrorKind::InvalidData, e));
         }
     };
     info!("Configuration demarshalled from command line arguments.");
@@ -41,30 +43,22 @@ fn main() {
     let (name, props) = args.chooser_params();
     info!("Chooser plugin name={} props={:?}", name, props);
 
-    let mut plugin = match chooser::get(name) {
+    let mut plugin = match chooser::get(name, &config.info.bands, &props) {
         Some(plugin) => plugin,
         None => {
             error!("Invalid plugin name: {}", name);
-            return;
+            return Err(Error::new(ErrorKind::InvalidInput, "Invalid plugin name"));
         }
     };
 
-    let mut systable = match NamedTempFile::new() {
-        Ok(fd) => fd,
-        Err(e) => {
-            error!("Unable to create temporary file for systable config: {}", e);
-            return;
-        }
-    };
-    write!(systable, "{}", config.info.raw).unwrap();
-    systable.seek(SeekFrom::Start(0)).unwrap();
+    // TODO: start actix
+
+    let mut systable = NamedTempFile::new()?;
+    write!(systable, "{}", config.info.raw)?;
+    systable.seek(SeekFrom::Start(0))?;
 
     let systable_temp_path = systable.into_temp_path();
-
-    let mut addition_args: Vec<String> = vec![];
-    if let Some(output) = config.output {
-        addition_args.extend_from_slice(&["--output".to_string(), output])
-    }
+    let timeout = Duration::from_secs(config.timeout as u64);
 
     info!(
         "System Table information written to {:?}",
@@ -73,14 +67,17 @@ fn main() {
     info!("Starting listening session...");
     info!("");
 
-    loop {
-        let band = match plugin.choose(&config.info.bands, &props) {
-            Ok(val) => val.clone(),
+    let mut bad_child_reads = 0;
+
+    while bad_child_reads < config.max_bad_child_reads {
+        let band = match plugin.choose() {
+            Ok(val) => val.to_owned(),
             Err(e) => {
                 error!("Failed to choose a frequency band to listen to: {}", e);
-                return;
+                return Err(Error::new(ErrorKind::InvalidData, e));
             }
         };
+
         info!("New session started: band={:?}", band);
 
         let bandwidth = match band.iter().max().unwrap_or(&0) - band.iter().min().unwrap_or(&0) {
@@ -88,22 +85,23 @@ fn main() {
             d if d <= 256 => "256000",
             _ => {
                 error!("Bandwidth calculation failed: {:?}", band);
-                return;
+                return Err(Error::new(
+                    ErrorKind::InvalidData,
+                    format!("Bandwidth calculation invalid: {:?}", band),
+                ));
             }
         };
 
         let mut proc = match Command::new(config.bin.clone())
             .stdout(Stdio::piped())
             .stderr(Stdio::null())
-            .arg("--soapysdr")
-            .arg(config.driver.clone())
             .arg("--system-table")
             .arg(systable_temp_path.to_path_buf())
             .arg("--sample-rate")
             .arg(bandwidth)
             .arg("--output")
             .arg("decoded:json:file:path=-")
-            .args(&addition_args)
+            .args(config.additional_args.clone())
             .args(band.into_iter().map(|f| f.to_string()))
             .spawn()
         {
@@ -114,7 +112,6 @@ fn main() {
             }
         };
 
-        let (frame_send, frame_recv) = bounded(2048);
         let child_stdout = match proc.stdout.take() {
             Some(stdout) => stdout,
             None => {
@@ -122,68 +119,69 @@ fn main() {
                 continue;
             }
         };
-        let reader_thread = thread::spawn(move || {
-            let mut reader = BufReader::new(child_stdout);
-
-            loop {
-                let mut line = String::new();
-                let size = match reader.read_line(&mut line) {
-                    Ok(size) => size,
-                    Err(e) => {
-                        error!("Reader thread encountered read error: {}", e);
-                        break;
-                    }
-                };
-                if size == 0 {
-                    error!("Reader thread encountered empty read: exiting...");
-                    break;
-                }
-
-                if frame_send.send(line).is_err() {
-                    error!("Reader thread failed to send to main thread: exiting...");
-                    break;
-                }
-            }
-        });
-
-        let timeout = Duration::from_secs(config.timeout as u64);
+        let mut reader = BufReader::new(child_stdout);
 
         loop {
-            select! {
-                recv(frame_recv) -> msg => {
-                    if msg.is_ok() {
-                        let msg = msg.unwrap();
+            let mut msg = String::new();
+
+            if let Ok(results) = rt::time::timeout(timeout, reader.read_line(&mut msg)).await {
+                match results {
+                    Ok(size) => {
+                        if size == 0 {
+                            error!("Read error: encountered 0 sized read from dumphfdl! (attempt {} of {})", bad_child_reads + 1, config.max_bad_child_reads);
+                            bad_child_reads += 1;
+                            break;
+                        }
 
                         let frame: Value = match serde_json::from_str(&msg) {
                             Ok(val) => val,
                             Err(e) => {
                                 error!("Bad JSON decode: {}", e);
                                 continue;
-                            },
+                            }
                         };
 
-                        info!("Received {} byte frame...", msg.len());
+                        info!("frame: {:?}", frame);
                         println!("{}", msg.trim());
 
-                        if plugin.on_update(&frame) {
-                            info!("Chooser update elected to change bands...");
+                        if plugin.on_recv_frame(&frame) {
+                            info!("{} elects to change bands after last HFDL frame.", name);
                             break;
                         }
                     }
-                },
-                recv(after(timeout)) -> _ => {
-                    if plugin.on_timeout() {
-                        info!("Timeout! Chooser elected to change bands...");
+                    Err(e) => {
+                        error!(
+                            "Read error: {} (attempt {} of {})",
+                            e,
+                            bad_child_reads + 1,
+                            config.max_bad_child_reads
+                        );
+
+                        bad_child_reads += 1;
                         break;
                     }
-                },
+                }
+            } else if plugin.on_timeout() {
+                info!(
+                    "Been {}s since last message on band. {} elects to change bands.",
+                    config.timeout, name
+                );
+                break;
             }
         }
 
-        proc.kill().unwrap();
-        reader_thread.join().unwrap();
+        proc.kill().await?;
 
         info!("Ending session...");
         info!("");
     }
+
+    if bad_child_reads > 0 {
+        error!("Encountered read errors from dumphfdl: process may be prematurely exiting");
+        error!(
+            "Verify that dumphfdl is being fed with correct arguments and can be run indepedently"
+        );
+    }
+
+    Ok(())
 }

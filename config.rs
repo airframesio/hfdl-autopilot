@@ -1,7 +1,9 @@
+use crate::args::Args;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::fmt;
+use std::fs;
 use std::path::PathBuf;
-use std::{env, fmt, fs};
 
 pub type GroundStationMap = HashMap<String, GroundStation>;
 pub type FrequencyBandMap = HashMap<u32, Vec<u32>>;
@@ -24,9 +26,9 @@ pub struct HFDLInfo {
 #[derive(Debug)]
 pub struct Config {
     pub bin: PathBuf,
-    pub driver: String,
-    pub output: Option<String>,
     pub timeout: u32,
+    pub additional_args: Vec<String>,
+    pub max_bad_child_reads: u32,
 
     pub info: HFDLInfo,
 }
@@ -42,38 +44,27 @@ impl Config {
             .map_err(|e| format!("Unable to deserialize dumphfdl system table: {}", e))
     }
 
-    pub fn from_args(args: &crate::args::Args) -> Result<Config, String> {
+    pub fn from_args(args: &Args) -> Result<Config, String> {
         if !args.bin.exists() || !args.bin.is_file() {
             return Err(format!(
                 "dumphfdl binary path does not exist or is not a file: {:?}",
                 args.bin
             ));
         }
-        if !args.sys_table.exists() || !args.bin.is_file() {
+        if !args.sys_table.exists() || !args.sys_table.is_file() {
             return Err(format!(
                 "dumphfdl system table definition does not exist or is not a file: {:?}",
                 args.sys_table
             ));
         }
 
-        let soapy_driver = env::var("HFDLAP_SOAPY_DRIVER").map_or_else(
-            |_| args.driver.clone(),
-            |val| {
-                if val.len() > 0 {
-                    val
-                } else {
-                    args.driver.clone()
-                }
-            },
-        );
-
         let info = Config::parse_systable(&args.sys_table)?;
 
         Ok(Config {
-            bin: args.bin.clone(),
-            driver: soapy_driver,
-            output: args.output.clone(),
+            bin: args.bin.to_owned(),
             timeout: args.timeout,
+            additional_args: args.additional_args.to_owned(),
+            max_bad_child_reads: 5,
             info,
         })
     }
@@ -83,8 +74,8 @@ impl fmt::Display for Config {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
-            "Config {{ bin={:?}, driver={}, output={:?} timeout={}s }}",
-            self.bin, self.driver, self.output, self.timeout
+            "Config {{ bin={:?} timeout={}s args={:?} }}",
+            self.bin, self.timeout, self.additional_args
         )
     }
 }

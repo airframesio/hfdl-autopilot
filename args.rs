@@ -1,21 +1,27 @@
 use clap::Parser;
-use std::collections::HashMap;
-use std::path::PathBuf;
+use std::{collections::HashMap, path::PathBuf};
 
 #[derive(Parser, Debug)]
-#[command(author, version, about, long_about = None)]
 pub struct Args {
+    /// Verbose mode
+    #[arg(short, long, default_value_t = false)]
+    pub verbose: bool,
+
+    /// Silence all output
+    #[arg(short, long, default_value_t = false)]
+    pub quiet: bool,
+
     /// Path to dumphfdl binary
-    #[arg(long, value_name = "FILE", default_value = "/usr/bin/dumphfdl")]
+    #[arg(long, value_name = "FILEPATH", default_value = "/usr/bin/dumphfdl")]
     pub bin: PathBuf,
 
-    /// Path to dumphfdl system table configuration
-    #[arg(long, value_name = "FILE", default_value = "/etc/systable.conf")]
+    /// Path to dumphfdl system table configuration file
+    #[arg(long, value_name = "FILEPATH", default_value = "/etc/systable.json")]
     pub sys_table: PathBuf,
 
-    /// SoapySDR driver configuration (override w/ HFDLAP_SOAPY_DRIVER)
-    #[arg(long, value_name = "DRIVER", default_value = "driver=airspyhf")]
-    pub driver: String,
+    /// Timeout in seconds to wait before switching HF bands
+    #[arg(short, long, value_name = "SECONDS", default_value_t = 150)]
+    pub timeout: u32,
 
     /// Methodology for changing HFDL bands
     #[arg(
@@ -25,21 +31,7 @@ pub struct Args {
     )]
     pub chooser: String,
 
-    /// Verbose mode
-    #[arg(short, long, default_value_t = false)]
-    pub verbose: bool,
-
-    /// Silence all output
-    #[arg(short, long, default_value_t = false)]
-    pub quiet: bool,
-
-    /// Timeout in seconds to wait before switching HF bands
-    #[arg(short, long, value_name = "SECONDS", default_value_t = 150)]
-    pub timeout: u32,
-
-    /// Output parameters passthrough to dumphfdl
-    #[arg(short, long, value_name = "OUTPUT")]
-    pub output: Option<String>,
+    pub additional_args: Vec<String>,
 }
 
 impl Args {
