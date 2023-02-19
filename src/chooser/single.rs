@@ -35,7 +35,7 @@ impl<'a> ChooserPlugin for SingleChooserPlugin<'a> {
             .ok_or(format!("Invalid band: {}", band))
     }
 
-    fn on_recv_frame(&mut self, frame: &serde_json::Value) -> bool {
+    fn on_recv_frame(&mut self, _frame: &serde_json::Value) -> bool {
         false
     }
 

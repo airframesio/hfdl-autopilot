@@ -28,6 +28,11 @@ pub struct Config {
     pub bin: PathBuf,
     pub timeout: u32,
     pub additional_args: Vec<String>,
+
+    pub swarm: bool,
+    pub host: String,
+    pub port: u16,
+
     pub max_bad_child_reads: u32,
 
     pub info: HFDLInfo,
@@ -64,7 +69,13 @@ impl Config {
             bin: args.bin.to_owned(),
             timeout: args.timeout,
             additional_args: args.additional_args.to_owned(),
-            max_bad_child_reads: 5,
+
+            swarm: args.swarm,
+            host: args.host.to_owned(),
+            port: args.port,
+
+            max_bad_child_reads: 1,
+
             info,
         })
     }

@@ -2,6 +2,7 @@ use crate::config::FrequencyBandMap;
 use serde_json::Value;
 use std::collections::HashMap;
 
+mod rotate;
 mod single;
 
 pub trait ChooserPlugin {
@@ -21,6 +22,7 @@ pub fn get<'a, 'b>(
     props: &'b HashMap<&str, &str>,
 ) -> Option<Box<dyn ChooserPlugin + 'b>> {
     match name {
+        rotate::NAME => Some(Box::new(rotate::RotateChooserPlugin::new(bands, props))),
         single::NAME => Some(Box::new(single::SingleChooserPlugin::new(bands, props))),
         _ => None,
     }

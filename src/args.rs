@@ -19,6 +19,18 @@ pub struct Args {
     #[arg(long, value_name = "FILEPATH", default_value = "/etc/systable.json")]
     pub sys_table: PathBuf,
 
+    /// When enabled, hfdl-autopilot connects to a swarm leader to ensure no duplicated bands
+    #[arg(long, default_value_t = false)]
+    pub swarm: bool,
+
+    /// Host to connect to (swarm mode ON) or listen on (swarm mode OFF)
+    #[arg(long, value_name = "HOST", default_value = "127.0.0.1")]
+    pub host: String,
+
+    /// Port to connect to (swarm mode ON) or listen on (swarm mode OFF)
+    #[arg(long, value_name = "PORT", default_value_t = 9090)]
+    pub port: u16,
+
     /// Timeout in seconds to wait before switching HF bands
     #[arg(short, long, value_name = "SECONDS", default_value_t = 150)]
     pub timeout: u32,

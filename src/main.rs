@@ -1,9 +1,9 @@
-use actix_web::rt;
+use actix_web::{rt, App, HttpServer};
 use clap::Parser;
 use log::*;
 use serde_json::Value;
 use std::io;
-use std::io::{Error, ErrorKind, Seek, SeekFrom, Write};
+use std::io::{Seek, SeekFrom, Write};
 use std::process::Stdio;
 use std::time::Duration;
 use tempfile::NamedTempFile;
@@ -13,6 +13,7 @@ use tokio::process::Command;
 mod args;
 mod chooser;
 mod config;
+mod http;
 
 #[tokio::main]
 async fn main() -> io::Result<()> {
@@ -51,7 +52,21 @@ async fn main() -> io::Result<()> {
         }
     };
 
-    // TODO: start actix
+    if config.swarm {
+        info!("Swarm mode is ON: target={}:{}", config.host, config.port)
+    } else {
+        info!(
+            "Swarm mode is OFF: starting web server on {}:{}",
+            config.host, config.port
+        );
+        tokio::spawn(async move {
+            let server = HttpServer::new(|| App::new().service(http::index))
+                .bind((config.host, config.port))
+                .unwrap()
+                .run();
+            server.await
+        });
+    }
 
     let mut systable = NamedTempFile::new()?;
     write!(systable, "{}", config.info.raw)?;
