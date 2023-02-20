@@ -13,7 +13,6 @@ pub const NAME: &'static str = "tracker";
 
 pub struct TrackerChooserPlugin<'a> {
     bands: &'a FrequencyBandMap,
-    props: &'a HashMap<&'a str, &'a str>,
     gs_info: Data<GroundStationMap>,
 
     rng: ThreadRng,
@@ -68,7 +67,6 @@ impl<'a> TrackerChooserPlugin<'a> {
 
         Ok(TrackerChooserPlugin {
             bands: &config.info.bands,
-            props,
             gs_info,
 
             rng: rand::thread_rng(),

@@ -74,6 +74,9 @@ async fn main() -> io::Result<()> {
         let flight_posrpt = shared_state.flight_posrpt.clone();
         let freq_stats = shared_state.freq_stats.clone();
 
+        let server_host = config.host.clone();
+        let server_port = config.port;
+
         tokio::spawn(async move {
             let server = HttpServer::new(move || {
                 App::new()
@@ -92,7 +95,7 @@ async fn main() -> io::Result<()> {
                     .route("/api/freq-stats", web::get().to(http::api_freq_stats))
                     .route("/api/flights", web::get().to(http::api_flights_list))
             })
-            .bind((config.host, config.port))
+            .bind((server_host, server_port))
             .unwrap()
             .run();
             server.await
