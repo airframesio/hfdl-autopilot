@@ -121,17 +121,17 @@ impl LPDU {
             return name.clone();
         } else if let Some(ref hfnpdu) = self.hfnpdu {
             if let Some(ref acars) = hfnpdu.acars {
-                return format!("{:7} (AC)", acars.reg);
+                return format!("Tail[{:>7}]", acars.reg);
             } else if let Some(ref flight_id) = hfnpdu.flight_id {
-                return format!("Flt[{:7}] (AC)", flight_id);
+                return format!(" Flt[{:>7}]", flight_id);
             }
         }
 
         if let Some(ac_info) = &self.ac_info {
-            return format!("Hex[{:6}] (AC)", ac_info.icao);
+            return format!("Icao[{:>7}]", ac_info.icao);
         }
 
-        format!("Id[{:03}] (AC)", entity.id)
+        format!("ACId[{:07}]", entity.id)
     }
 
     pub fn source(&self) -> String {
