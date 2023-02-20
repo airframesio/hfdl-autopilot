@@ -2,11 +2,12 @@
 Dynamic `dumphfdl` wrapper that changes listening frequencies based off of HFDL activity.
 
 ### TODO
-- [ ] Derive bands from SPDU via provided system table config instead of current shortcut.
-- [ ] Allow more `dumphfdl` command line argument passthrough
-- [ ] Allow more arguments to be configurable via environment variables
+- [ ] 
+- [x] Derive bands from SPDU via provided system table config instead of current shortcut.
+- [x] Allow more `dumphfdl` command line argument passthrough
+- [ ] <strike>Allow more arguments to be configurable via environment variables</strike>
 - [ ] Use Airframes SPDU API to immediately hone into active frequencies
-- [ ] Use "heard from" data from aircraft's HFNPDU messages
+- [x] Use "heard from" data from aircraft's HFNPDU messages
 
 ### Building
 First, install a stable [Rust](https://www.rust-lang.org/learn/get-started) toolchain. Make sure the `cargo` command is in `PATH` environment variable after completion. 
@@ -19,6 +20,11 @@ Second, clone this repository:
 Third, compile and build `hfdl-autopilot`:
 ```
 cargo build --release  
+```
+
+### Example
+```
+hfdl-autopilot --bin /usr/local/bin/dumphfdl --sys-table /usr/local/etc/systable.json -v --port 7270 --chooser tracker:target=Albrook --timeout 150 -- --soapysdr driver=airspyhf --output decoded:json:tcp:address=feed.airframes.io,port=5556
 ```
 
 ### Modes
@@ -36,15 +42,16 @@ Valid `type`s:
 * `dec` - on timeout, move on to the next lowest band; if already on the lowest band, move to the highest in the list
 * `random` - on timeout, choose a random band that we haven't visited in the last 6 sessions
 ```
---chooser rotate:type=random,start=21
+--chooser rotate:type=random,start=21,ignore_last=8
 ```
 #### `tracker`
 Track messages to/from a specific ground station. Move on to a new band if inactivity timeout occurs or we haven't heard a message to/from target for `timeout` seconds.
 ```
---chooser tracker:target=Agana,timeout=600
+--chooser tracker:target=Agana,last_heard_timeout=600
 ```
-### Output
-Use the `--output` flag to add an additional output method. For example:
-```
---output decoded:json:udp:address=127.0.0.1,port=8000
-```
+
+### Web API
+By default, `hfdl-autopilot` will expose a simple REST API on port 7270. This API allows users to query session state information such as flight position reports (via HFDL link layer), latest ground stations frequencies, and message statistics.
+* `/api/ground-stations`
+* `/api/ground-stations/stats`
+* `/api/freq-stats`
