@@ -13,5 +13,6 @@ class EchoServerHandler(socketserver.BaseRequestHandler):
 if __name__ == "__main__":
   if "--exit" in sys.argv[1 : ]:
     sys.exit(1)
+  socketserver.TCPServer.allow_reuse_address = True
   with socketserver.TCPServer(("localhost", 9000), EchoServerHandler) as server:
     server.serve_forever()
