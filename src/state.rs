@@ -150,7 +150,7 @@ impl SharedState {
 
     pub fn freq_to_band(&self, freq: f64) -> Option<u32> {
         for (band, freqs) in &self.bands {
-            if freqs.iter().position(|&x| x == (freq as u32)).is_some() {
+            if freqs.iter().any(|&x| x == (freq as u32)) {
                 return Some(*band);
             }
         }
@@ -204,7 +204,7 @@ impl SharedState {
                     .map(|x| self.freq_to_band(x.freq).unwrap_or(0))
                     .collect();
 
-                if bands.iter().position(|&x| x == 0).is_some() {
+                if bands.iter().any(|&x| x == 0) {
                     error!(
                         "ERROR => found frequency in {:?} that does not match band!",
                         info.freqs
@@ -281,7 +281,7 @@ impl SharedState {
                                 .iter()
                                 .map(|x| self.freq_to_band(x.freq).unwrap_or(0))
                                 .collect();
-                            if heard_bands.iter().position(|&x| x == 0).is_some() {
+                            if heard_bands.iter().any(|&x| x == 0) {
                                 error!(
                                     "ERROR => found frequency in {:?} that does not match band!",
                                     info.heard_on_freqs
@@ -321,8 +321,14 @@ impl SharedState {
                                 .flight_posrpt
                                 .get_mut(hfnpdu.flight_id.as_ref().unwrap())
                             {
-                                entry.positions.push(report);
-                                entry.last_heard = Instant::now();
+                                if !entry
+                                    .positions
+                                    .iter()
+                                    .any(|x| x.position == report.position)
+                                {
+                                    entry.positions.push(report);
+                                    entry.last_heard = Instant::now();
+                                }
                             } else {
                                 self.flight_posrpt.insert(
                                     hfnpdu.flight_id.as_ref().unwrap().clone(),

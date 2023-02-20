@@ -65,12 +65,7 @@ impl<'a> ChooserPlugin for RotateChooserPlugin<'a> {
             );
 
             let mut new_idx = self.band_idx.unwrap();
-            while self
-                .recently_used
-                .iter()
-                .position(|&x| x == new_idx)
-                .is_some()
-            {
+            while self.recently_used.iter().any(|&x| x == new_idx) {
                 new_idx = self.rng.gen_range(0..(self.band_keys.len() - 1));
             }
 
