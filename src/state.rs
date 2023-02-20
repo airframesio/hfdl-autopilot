@@ -243,9 +243,9 @@ impl SharedState {
             }
 
             info!(
-                " SPDU[{}]({:.1}) {:>4}  {:>13} -> {:<13}  [Update GS Freqs]",
+                " SPDU[{:>6}]({:>5}) {:>4}  {:>13} -> {:<13}  [Update GS Freqs]",
                 frame.hfdl.frequency(),
-                frame.hfdl.sig_level,
+                frame.hfdl.signal(),
                 frame.hfdl.bit_rate,
                 spdu.source(),
                 "BROADCAST"
@@ -274,9 +274,9 @@ impl SharedState {
             if let Some(ref hfnpdu) = lpdu.hfnpdu {
                 if let Some(ref acars) = hfnpdu.acars {
                     info!(
-                        "ACARS[{}]({:.1}) {:>4}  {:>13} -> {:<13}  {:<7} {:<2} {:1} {:1}",
+                        "ACARS[{:>6}]({:>5}) {:>4}  {:>13} -> {:<13}  {:<7} {:<2} {:1} {:1}",
                         frame.hfdl.frequency(),
-                        frame.hfdl.sig_level,
+                        frame.hfdl.signal(),
                         frame.hfdl.bit_rate,
                         lpdu.source(),
                         lpdu.destination(),
@@ -287,9 +287,9 @@ impl SharedState {
                     );
                 } else {
                     info!(
-                        "HFNPD[{}]({:.1}) {:>4}  {:>13} -> {:<13}  [{}]",
+                        "HFNPD[{:>6}]({:>5}) {:>4}  {:>13} -> {:<13}  [{}]",
                         frame.hfdl.frequency(),
-                        frame.hfdl.sig_level,
+                        frame.hfdl.signal(),
                         frame.hfdl.bit_rate,
                         lpdu.source(),
                         lpdu.destination(),
@@ -372,9 +372,9 @@ impl SharedState {
                 }
             } else {
                 info!(
-                    " LPDU[{}]({:.1}) {:>4}  {:>13} -> {:<13}  [{}]",
+                    " LPDU[{:>6}]({:>5}) {:>4}  {:>13} -> {:<13}  [{}]",
                     frame.hfdl.frequency(),
-                    frame.hfdl.sig_level,
+                    frame.hfdl.signal(),
                     frame.hfdl.bit_rate,
                     lpdu.source(),
                     lpdu.destination(),

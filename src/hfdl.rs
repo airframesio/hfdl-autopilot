@@ -174,8 +174,12 @@ pub struct HFDL {
 }
 
 impl HFDL {
-    pub fn frequency(&self) -> f32 {
-        (self.freq as f32) / 1000000.0
+    pub fn frequency(&self) -> String {
+        format!("{:.3}", (self.freq as f32) / 1000000.0)
+    }
+
+    pub fn signal(&self) -> String {
+        format!("{:.1}", self.sig_level)
     }
 }
 
