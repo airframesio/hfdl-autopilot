@@ -19,8 +19,13 @@ pub type GroundStationMap = DashMap<u8, GroundStationInfo>;
 #[derive(Debug, Serialize)]
 pub struct GroundStationStat {
     pub name: String,
+
     pub to_msgs: u64,
+    pub to_freqs: Vec<u32>,
+
     pub from_msgs: u64,
+    pub from_freqs: Vec<u32>,
+
     pub last_heard: Option<DateTime<Utc>>,
 }
 
@@ -81,7 +86,9 @@ pub fn gs_stats_from_config(config: &Config) -> GroundStationStats {
             GroundStationStat {
                 name: gs_info.name.clone(),
                 to_msgs: 0,
+                to_freqs: vec![],
                 from_msgs: 0,
+                from_freqs: vec![],
                 last_heard: None,
             },
         );
@@ -93,9 +100,17 @@ pub fn gs_stats_from_config(config: &Config) -> GroundStationStats {
 pub type PositionReportsByFlightMap = DashMap<String, PositionReports>;
 
 #[derive(Debug, Serialize)]
+pub struct PropagationReport {
+    id: u8,
+    name: String,
+    location: Vec<f64>,
+    bands: Vec<u32>,
+}
+
+#[derive(Debug, Serialize)]
 pub struct PositionReport {
     pub position: Vec<f64>,
-    pub propagation: Vec<Vec<f64>>,
+    pub propagation: Vec<PropagationReport>,
 }
 
 #[derive(Debug)]
@@ -221,6 +236,9 @@ impl SharedState {
 
             if let Some(mut entry) = self.gs_stats.get_mut(&spdu.src.id) {
                 entry.from_msgs += 1;
+                if !entry.from_freqs.iter().any(|&x| x == frame.hfdl.freq) {
+                    entry.from_freqs.push(frame.hfdl.freq);
+                }
                 entry.last_heard = Some(offset::Utc::now());
             }
 
@@ -236,6 +254,9 @@ impl SharedState {
             if lpdu.src.entity_name.is_some() {
                 if let Some(mut entry) = self.gs_stats.get_mut(&lpdu.src.id) {
                     entry.from_msgs += 1;
+                    if !entry.from_freqs.iter().any(|&x| x == frame.hfdl.freq) {
+                        entry.from_freqs.push(frame.hfdl.freq);
+                    }
                     entry.last_heard = Some(offset::Utc::now());
                 }
             }
@@ -243,6 +264,9 @@ impl SharedState {
             if lpdu.dst.entity_name.is_some() {
                 if let Some(mut entry) = self.gs_stats.get_mut(&lpdu.dst.id) {
                     entry.to_msgs += 1;
+                    if !entry.to_freqs.iter().any(|&x| x == frame.hfdl.freq) {
+                        entry.to_freqs.push(frame.hfdl.freq);
+                    }
                     entry.last_heard = Some(offset::Utc::now());
                 }
             }
@@ -272,7 +296,7 @@ impl SharedState {
                         hfnpdu.msg_type()
                     );
 
-                    let mut propagation: Vec<Vec<f64>> = vec![];
+                    let mut propagation: Vec<PropagationReport> = vec![];
 
                     if let Some(ref freq_data) = hfnpdu.freq_data {
                         for info in freq_data {
@@ -290,7 +314,12 @@ impl SharedState {
                                 return;
                             } else if heard_bands.len() > 0 {
                                 if let Some(gs) = self.gs_info.get(&info.gs.id) {
-                                    propagation.push(gs.position.clone());
+                                    propagation.push(PropagationReport {
+                                        id: info.gs.id,
+                                        name: gs.name.clone(),
+                                        location: gs.position.clone(),
+                                        bands: heard_bands.clone(),
+                                    });
                                 }
 
                                 if let Some(mut entry) = self.gs_info.get_mut(&info.gs.id) {
