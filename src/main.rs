@@ -1,5 +1,5 @@
 use crate::state::SharedState;
-use actix_web::{rt, App, HttpServer};
+use actix_web::{rt, web, App, HttpServer};
 use clap::Parser;
 use log::*;
 use serde_json::Value;
@@ -69,6 +69,7 @@ async fn main() -> io::Result<()> {
         );
 
         let gs_info = shared_state.gs_info.clone();
+        let gs_stats = shared_state.gs_stats.clone();
         let flight_posrpt = shared_state.flight_posrpt.clone();
         let freq_stats = shared_state.freq_stats.clone();
 
@@ -78,9 +79,11 @@ async fn main() -> io::Result<()> {
             let server = HttpServer::new(move || {
                 App::new()
                     .app_data(gs_info.clone())
+                    .app_data(gs_stats.clone())
                     .app_data(flight_posrpt.clone())
                     .app_data(freq_stats.clone())
-                    .service(http::index)
+                    .route("/", web::get().to(http::web_index))
+                    .route("/api/ground-stations", web::get().to(http::api_gs_list))
             })
             .bind((config.host, config.port))
             .unwrap()
