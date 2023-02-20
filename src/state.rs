@@ -1,6 +1,8 @@
 use crate::config::{Config, FrequencyBandMap};
 use crate::hfdl::Frame;
 use actix_web::web::Data;
+use chrono::offset;
+use chrono::{DateTime, Utc};
 use dashmap::DashMap;
 use log::*;
 use serde::ser;
@@ -13,12 +15,12 @@ pub type FrequencyStats = DashMap<u32, u32>;
 pub type GroundStationStats = DashMap<u8, GroundStationStat>;
 pub type GroundStationMap = DashMap<u8, GroundStationInfo>;
 
-#[derive(Debug)]
+#[derive(Debug, Serialize)]
 pub struct GroundStationStat {
     pub name: String,
     pub to_msgs: u64,
     pub from_msgs: u64,
-    // TOOD:  last_heard_ts
+    pub last_heard: Option<DateTime<Utc>>,
 }
 
 #[derive(Debug)]
@@ -62,6 +64,23 @@ pub fn gs_info_from_config(config: &Config) -> GroundStationMap {
     }
 
     info
+}
+
+pub fn gs_stats_from_config(config: &Config) -> GroundStationStats {
+    let stats = GroundStationStats::new();
+    for (_, gs_info) in &config.info.stations {
+        stats.insert(
+            gs_info.id,
+            GroundStationStat {
+                name: gs_info.name.clone(),
+                to_msgs: 0,
+                from_msgs: 0,
+                last_heard: None,
+            },
+        );
+    }
+
+    stats
 }
 
 pub type PositionReportsByFlightMap = DashMap<String, PositionReports>;
@@ -109,7 +128,7 @@ impl SharedState {
             bands: config.info.bands.clone(),
 
             gs_info: Data::new(gs_info_from_config(config)),
-            gs_stats: Data::new(GroundStationStats::new()),
+            gs_stats: Data::new(gs_stats_from_config(&config)),
             flight_posrpt: Data::new(PositionReportsByFlightMap::new()),
             freq_stats: Data::new(FrequencyStats::new()),
         }
@@ -134,6 +153,10 @@ impl SharedState {
             }
         };
 
+        {
+            *self.freq_stats.entry(frame.hfdl.freq).or_insert(0) += 1;
+        }
+
         if let Some(ref spdu) = frame.hfdl.spdu {
             for info in &spdu.gs_status {
                 let bands: Vec<u32> = info
@@ -151,13 +174,15 @@ impl SharedState {
                     return;
                 }
 
-                match self.gs_info.get_mut(&info.gs.id) {
-                    Some(mut entry) => {
-                        entry.active_bands = bands;
-                        entry.last_heard = Some(Instant::now());
-                    }
-                    None => {}
+                if let Some(mut entry) = self.gs_info.get_mut(&info.gs.id) {
+                    entry.active_bands = bands;
+                    entry.last_heard = Some(Instant::now());
                 }
+            }
+
+            if let Some(mut entry) = self.gs_stats.get_mut(&spdu.src.id) {
+                entry.from_msgs += 1;
+                entry.last_heard = Some(offset::Utc::now());
             }
 
             info!(
@@ -175,6 +200,20 @@ impl SharedState {
                     .collect::<Vec<&String>>()
             );
         } else if let Some(ref lpdu) = frame.hfdl.lpdu {
+            if lpdu.src.entity_name.is_some() {
+                if let Some(mut entry) = self.gs_stats.get_mut(&lpdu.src.id) {
+                    entry.from_msgs += 1;
+                    entry.last_heard = Some(offset::Utc::now());
+                }
+            }
+
+            if lpdu.dst.entity_name.is_some() {
+                if let Some(mut entry) = self.gs_stats.get_mut(&lpdu.dst.id) {
+                    entry.to_msgs += 1;
+                    entry.last_heard = Some(offset::Utc::now());
+                }
+            }
+
             if let Some(ref hfnpdu) = lpdu.hfnpdu {
                 if let Some(ref acars) = hfnpdu.acars {
                     info!(
@@ -191,7 +230,7 @@ impl SharedState {
                     );
                 } else {
                     info!(
-                        "  HFN[{}]({:.1}) {:>4}bps  {} -> {}  {}",
+                        "HFNPD[{}]({:.1}) {:>4}bps  {} -> {}  {}",
                         frame.hfdl.frequency(),
                         frame.hfdl.sig_level,
                         frame.hfdl.bit_rate,
@@ -199,6 +238,52 @@ impl SharedState {
                         lpdu.destination(),
                         hfnpdu.msg_type()
                     );
+
+                    let mut propagation: Vec<Vec<f64>> = vec![];
+
+                    if let Some(ref freq_data) = hfnpdu.freq_data {
+                        for info in freq_data {
+                            let heard_bands: Vec<u32> = info
+                                .heard_on_freqs
+                                .iter()
+                                .map(|x| self.freq_to_band(x.freq).unwrap_or(0))
+                                .collect();
+                            if heard_bands.iter().position(|&x| x == 0).is_some() {
+                                error!(
+                                    "ERROR => found frequency in {:?} that does not match band!",
+                                    info.heard_on_freqs
+                                );
+                                error!("         Most likely data consistency issue, make sure systable.json has proper bandwidth settings!");
+                                return;
+                            } else if heard_bands.len() > 0 {
+                                if let Some(gs) = self.gs_info.get(&info.gs.id) {
+                                    propagation.push(gs.position.clone());
+                                }
+
+                                if let Some(mut entry) = self.gs_info.get_mut(&info.gs.id) {
+                                    entry.active_bands.extend(heard_bands);
+                                    entry.active_bands.sort();
+                                    entry.active_bands.dedup();
+                                    entry.last_heard = Some(Instant::now());
+                                }
+                            }
+                        }
+                    }
+
+                    if hfnpdu.flight_id.is_some() && hfnpdu.pos.is_some() {
+                        let pos = hfnpdu.pos.as_ref().unwrap();
+
+                        if let Some(mut entry) = self
+                            .flight_posrpt
+                            .get_mut(hfnpdu.flight_id.as_ref().unwrap())
+                        {
+                            entry.positions.push(PositionReport {
+                                position: vec![pos.lon, pos.lat],
+                                propagation,
+                            });
+                            entry.last_heard = Some(Instant::now());
+                        }
+                    }
                 }
             } else {
                 info!(

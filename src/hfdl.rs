@@ -58,8 +58,8 @@ pub struct AircraftInfo {
 #[allow(dead_code)]
 #[derive(Deserialize, Debug)]
 pub struct Position {
-    pub lat: f32,
-    pub lon: f32,
+    pub lat: f64,
+    pub lon: f64,
 }
 
 #[allow(dead_code)]
