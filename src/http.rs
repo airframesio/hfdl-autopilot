@@ -1,3 +1,5 @@
+use std::sync::RwLock;
+
 use actix_web::http::header::ContentType;
 use actix_web::web::Data;
 use actix_web::{HttpRequest, HttpResponse};
@@ -37,11 +39,12 @@ pub async fn api_freq_stats(req: HttpRequest) -> HttpResponse {
 }
 
 pub async fn api_session_list(req: HttpRequest) -> HttpResponse {
-    let session = req.app_data::<Data<SessionState>>().unwrap();
+    let session_ptr = req.app_data::<Data<RwLock<SessionState>>>().unwrap();
+    let session = session_ptr.read().unwrap();
 
     HttpResponse::Ok()
         .content_type(ContentType::json())
-        .body(serde_json::to_string(&session).unwrap())
+        .body(serde_json::to_string(&*session).unwrap())
 }
 
 pub async fn api_flights_list(req: HttpRequest) -> HttpResponse {
