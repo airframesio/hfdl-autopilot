@@ -6,7 +6,7 @@ import sys
 
 class EchoServerHandler(socketserver.BaseRequestHandler):
   def handle(self):
-    data = self.request.recv(4096).decode("utf-8")
+    data = self.request.recv(8192).decode("utf-8")
     sys.stdout.write(data)
     sys.stdout.flush()
     

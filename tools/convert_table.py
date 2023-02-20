@@ -7,7 +7,7 @@ import logging
 import os
 
 
-BANDWIDTH_LIMIT = 384
+BANDWIDTH_LIMIT = 500
 
 
 def OutputFileType(path: str) -> str:

@@ -10,10 +10,10 @@ pub type FrequencyBandMap = HashMap<u32, Vec<u32>>;
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct GroundStation {
-    id: u32,
-    name: String,
-    lat: f64,
-    lon: f64,
+    pub id: u8,
+    pub name: String,
+    pub lat: f64,
+    pub lon: f64,
 }
 
 #[derive(Serialize, Deserialize, Debug)]

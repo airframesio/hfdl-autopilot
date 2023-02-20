@@ -1,3 +1,4 @@
+use crate::state::SharedState;
 use actix_web::{rt, App, HttpServer};
 use clap::Parser;
 use log::*;
@@ -5,7 +6,6 @@ use serde_json::Value;
 use std::io;
 use std::io::{Seek, SeekFrom, Write};
 use std::process::Stdio;
-use std::sync::Arc;
 use std::time::Duration;
 use tempfile::NamedTempFile;
 use tokio::io::{AsyncBufReadExt, BufReader};
@@ -55,10 +55,11 @@ async fn main() -> io::Result<()> {
         }
     };
 
-    let shared_state = Arc::new(state::SharedState::new(&config));
+    let mut shared_state = SharedState::new(&config);
 
     if config.swarm {
-        info!("Swarm mode is ON: target={}:{}", config.host, config.port)
+        info!("Swarm mode is ON: target={}:{}", config.host, config.port);
+        error!("UNSUPPORTED for now...");
 
         // TODO: what does swarm mode look like
     } else {
@@ -66,12 +67,24 @@ async fn main() -> io::Result<()> {
             "Swarm mode is OFF: starting web server on {}:{}",
             config.host, config.port
         );
+
+        let gs_info = shared_state.gs_info.clone();
+        let flight_posrpt = shared_state.flight_posrpt.clone();
+        let freq_stats = shared_state.freq_stats.clone();
+
         tokio::spawn(async move {
             // TODO: add routes
-            let server = HttpServer::new(|| App::new().service(http::index))
-                .bind((config.host, config.port))
-                .unwrap()
-                .run();
+
+            let server = HttpServer::new(move || {
+                App::new()
+                    .app_data(gs_info.clone())
+                    .app_data(flight_posrpt.clone())
+                    .app_data(freq_stats.clone())
+                    .service(http::index)
+            })
+            .bind((config.host, config.port))
+            .unwrap()
+            .run();
             server.await
         });
     }
@@ -104,6 +117,7 @@ async fn main() -> io::Result<()> {
         info!("New session started: band={:?}", band);
 
         let bandwidth = match band.iter().max().unwrap_or(&0) - band.iter().min().unwrap_or(&0) {
+            d if d > 384 && d <= 512 => "512000",
             d if d > 256 && d <= 384 => "384000",
             d if d <= 256 => "256000",
             _ => {
@@ -161,9 +175,11 @@ async fn main() -> io::Result<()> {
                             }
                         };
 
-                        // TODO: parse HFDL frame
-
                         println!("{}", msg.trim());
+
+                        {
+                            shared_state.update(&frame);
+                        }
 
                         if plugin.on_recv_frame(&frame) {
                             info!("{} elects to change bands after last HFDL frame.", name);
