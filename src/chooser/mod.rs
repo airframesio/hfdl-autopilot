@@ -1,4 +1,6 @@
 use crate::config::FrequencyBandMap;
+use crate::state::GroundStationMap;
+use actix_web::web::Data;
 use serde_json::Value;
 use std::collections::HashMap;
 
@@ -20,6 +22,7 @@ pub fn get<'a, 'b>(
     name: &'a str,
     bands: &'b FrequencyBandMap,
     props: &'b HashMap<&str, &str>,
+    _gs_info: Data<GroundStationMap>,
 ) -> Option<Box<dyn ChooserPlugin + 'b>> {
     match name {
         rotate::NAME => Some(Box::new(rotate::RotateChooserPlugin::new(bands, props))),

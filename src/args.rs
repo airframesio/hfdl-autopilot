@@ -28,8 +28,16 @@ pub struct Args {
     pub host: String,
 
     /// Port to connect to (swarm mode ON) or listen on (swarm mode OFF)
-    #[arg(long, value_name = "PORT", default_value_t = 9090)]
+    #[arg(long, value_name = "PORT", default_value_t = 7270)]
     pub port: u16,
+
+    // Timeout in seconds before SPDU timeout and active frequencies are considered stale
+    #[arg(long, value_name = "SECONDS", default_value_t = 900)]
+    pub spdu_timeout: u64,
+
+    // Timeout in seconds before a flight is considered stale
+    #[arg(long, value_name = "SECONDS", default_value_t = 1800)]
+    pub ac_timeout: u64,
 
     /// Timeout in seconds to wait before switching HF bands
     #[arg(short, long, value_name = "SECONDS", default_value_t = 150)]

@@ -6,7 +6,7 @@ use serde_json::Value;
 use std::io;
 use std::io::{Seek, SeekFrom, Write};
 use std::process::Stdio;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 use tempfile::NamedTempFile;
 use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio::process::Command;
@@ -47,15 +47,20 @@ async fn main() -> io::Result<()> {
     let (name, props) = args.chooser_params();
     info!("Chooser plugin name={} props={:?}", name, props);
 
-    let mut plugin = match chooser::get(name, &config.info.bands, &props) {
+    let mut shared_state = SharedState::new(&config);
+
+    let mut plugin = match chooser::get(
+        name,
+        &config.info.bands,
+        &props,
+        shared_state.gs_info.clone(),
+    ) {
         Some(plugin) => plugin,
         None => {
             error!("Invalid plugin name: {}", name);
             return Ok(());
         }
     };
-
-    let mut shared_state = SharedState::new(&config);
 
     if config.swarm {
         info!("Swarm mode is ON: target={}:{}", config.host, config.port);
@@ -74,8 +79,6 @@ async fn main() -> io::Result<()> {
         let freq_stats = shared_state.freq_stats.clone();
 
         tokio::spawn(async move {
-            // TODO: add routes
-
             let server = HttpServer::new(move || {
                 App::new()
                     .app_data(gs_info.clone())
@@ -84,6 +87,12 @@ async fn main() -> io::Result<()> {
                     .app_data(freq_stats.clone())
                     .route("/", web::get().to(http::web_index))
                     .route("/api/ground-stations", web::get().to(http::api_gs_list))
+                    .route(
+                        "/api/ground-stations/stats",
+                        web::get().to(http::api_gs_stats),
+                    )
+                    .route("/api/freq-stats", web::get().to(http::api_freq_stats))
+                    .route("/api/flights", web::get().to(http::api_flights_list))
             })
             .bind((config.host, config.port))
             .unwrap()
@@ -157,6 +166,7 @@ async fn main() -> io::Result<()> {
             }
         };
         let mut reader = BufReader::new(child_stdout);
+        let mut last_cleanup = Instant::now();
 
         loop {
             let mut msg = String::new();
@@ -180,13 +190,16 @@ async fn main() -> io::Result<()> {
 
                         println!("{}", msg.trim());
 
-                        {
-                            shared_state.update(&frame);
-                        }
+                        shared_state.update(&frame);
 
                         if plugin.on_recv_frame(&frame) {
                             info!("{} elects to change bands after last HFDL frame.", name);
                             break;
+                        }
+
+                        if last_cleanup.elapsed().as_secs() >= config.ac_timeout {
+                            shared_state.clean_up();
+                            last_cleanup = Instant::now();
                         }
                     }
                     Err(e) => {
@@ -214,6 +227,8 @@ async fn main() -> io::Result<()> {
 
         info!("Ending session...");
         info!("");
+
+        shared_state.clean_up();
     }
 
     if bad_child_reads > 0 {

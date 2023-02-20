@@ -115,6 +115,8 @@ impl ser::Serialize for PositionReports {
 
 pub struct SharedState {
     bands: FrequencyBandMap,
+    spdu_timeout: u64,
+    ac_timeout: u64,
 
     pub gs_info: Data<GroundStationMap>,
     pub gs_stats: Data<GroundStationStats>,
@@ -126,6 +128,8 @@ impl SharedState {
     pub fn new(config: &Config) -> Self {
         SharedState {
             bands: config.info.bands.clone(),
+            spdu_timeout: config.spdu_timeout,
+            ac_timeout: config.ac_timeout,
 
             gs_info: Data::new(gs_info_from_config(config)),
             gs_stats: Data::new(gs_stats_from_config(&config)),
@@ -142,6 +146,28 @@ impl SharedState {
         }
 
         None
+    }
+
+    pub fn clean_up(&mut self) {
+        let stale_flights: Vec<u8> = self
+            .gs_info
+            .iter()
+            .filter(|x| {
+                x.value()
+                    .last_heard
+                    .unwrap_or(Instant::now())
+                    .elapsed()
+                    .as_secs()
+                    >= self.ac_timeout
+            })
+            .map(|x| *x.key())
+            .collect();
+
+        info!("CLEAN UP: Removing stale flights => {:?}", stale_flights);
+
+        for stale_flight in stale_flights.iter() {
+            self.gs_info.remove(stale_flight);
+        }
     }
 
     pub fn update(&mut self, msg: &Value) {
@@ -261,10 +287,15 @@ impl SharedState {
                                 }
 
                                 if let Some(mut entry) = self.gs_info.get_mut(&info.gs.id) {
-                                    entry.active_bands.extend(heard_bands);
-                                    entry.active_bands.sort();
-                                    entry.active_bands.dedup();
-                                    entry.last_heard = Some(Instant::now());
+                                    if entry.active_bands.len() == 0
+                                        || (entry.last_heard.is_some()
+                                            && entry.last_heard.unwrap().elapsed().as_secs()
+                                                >= self.spdu_timeout)
+                                    {
+                                        // NOTE: heard-from data is not very reliable and should not be used unless SPDU timed out or isn't populated
+                                        entry.active_bands = heard_bands;
+                                        entry.last_heard = Some(Instant::now());
+                                    }
                                 }
                             }
                         }
