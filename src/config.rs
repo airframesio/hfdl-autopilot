@@ -14,6 +14,7 @@ pub struct GroundStation {
     pub name: String,
     pub lat: f64,
     pub lon: f64,
+    pub assigned: Vec<u32>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]

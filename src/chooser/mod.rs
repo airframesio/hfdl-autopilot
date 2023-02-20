@@ -1,4 +1,4 @@
-use crate::config::FrequencyBandMap;
+use crate::config::Config;
 use crate::state::GroundStationMap;
 use actix_web::web::Data;
 use serde_json::Value;
@@ -6,6 +6,16 @@ use std::collections::HashMap;
 
 mod rotate;
 mod single;
+mod tracker;
+
+macro_rules! init_plugin {
+    ($l:expr) => {
+        match $l {
+            Ok(plugin) => Box::new(plugin),
+            Err(e) => return Err(e),
+        }
+    };
+}
 
 pub trait ChooserPlugin {
     /// Invoked to calculate next band to listen to
@@ -20,13 +30,16 @@ pub trait ChooserPlugin {
 
 pub fn get<'a, 'b>(
     name: &'a str,
-    bands: &'b FrequencyBandMap,
+    config: &'b Config,
     props: &'b HashMap<&str, &str>,
-    _gs_info: Data<GroundStationMap>,
-) -> Option<Box<dyn ChooserPlugin + 'b>> {
-    match name {
-        rotate::NAME => Some(Box::new(rotate::RotateChooserPlugin::new(bands, props))),
-        single::NAME => Some(Box::new(single::SingleChooserPlugin::new(bands, props))),
-        _ => None,
-    }
+    gs_info: Data<GroundStationMap>,
+) -> Result<Box<dyn ChooserPlugin + 'b>, String> {
+    let chooser: Box<dyn ChooserPlugin> = match name {
+        rotate::NAME => init_plugin!(rotate::RotateChooserPlugin::new(&config.info.bands, props)),
+        single::NAME => init_plugin!(single::SingleChooserPlugin::new(&config.info.bands, props)),
+        tracker::NAME => init_plugin!(tracker::TrackerChooserPlugin::new(config, props, gs_info)),
+        _ => return Err(format!("{} is not a valid chooser plugin", name)),
+    };
+
+    Ok(chooser)
 }

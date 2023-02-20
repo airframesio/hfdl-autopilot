@@ -5,8 +5,9 @@ import json
 import libconf
 import logging
 import os
-
-
+import sys
+from typing import List, Mapping, Optional
+    
 BANDWIDTH_LIMIT = 500
 
 
@@ -15,6 +16,14 @@ def OutputFileType(path: str) -> str:
     if not os.path.isdir(parent_path):
         raise argparse.ArgumentTypeError("Output file path parent directory doesn't exist: {}".format(parent_path))
     return path
+
+
+def get_band_for_freq(bands: Mapping[int, List[float]], freq: float) -> Optional[int]:
+    for band in bands:
+        freqs = bands[band]
+        if freq in freqs:
+            return band
+    return None
 
 
 if __name__ == "__main__":
@@ -54,6 +63,23 @@ if __name__ == "__main__":
                 band = int(freq / 1000.0)
                 bands[band] = [freq]
 
+    for station in config["stations"]:
+        name = station["name"]
+        if name in stations:
+            info = stations[name]
+            stations[name]["assigned"] = list(
+                set(
+                    map(
+                        lambda x: get_band_for_freq(bands, x), 
+                        sorted(station["frequencies"])
+                    )
+                )
+            )            
+        else:
+            sys.stderr.write("ERROR: Missing GS station '{}' in final JSON\n".format(name))
+            sys.stderr.flush()
+            sys.exit(1)
+            
     args.systable.seek(0)
             
     info = {

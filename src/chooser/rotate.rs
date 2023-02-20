@@ -22,7 +22,10 @@ pub struct RotateChooserPlugin<'a> {
 }
 
 impl<'a> RotateChooserPlugin<'a> {
-    pub fn new(bands: &'a FrequencyBandMap, props: &'a HashMap<&'a str, &'a str>) -> Self {
+    pub fn new(
+        bands: &'a FrequencyBandMap,
+        props: &'a HashMap<&'a str, &'a str>,
+    ) -> Result<Self, String> {
         let mut band_keys: Vec<&u32> = bands.keys().into_iter().collect();
         band_keys.sort_unstable();
 
@@ -32,7 +35,7 @@ impl<'a> RotateChooserPlugin<'a> {
             .position(|&&x| x == start_band)
             .unwrap_or(0);
 
-        RotateChooserPlugin {
+        Ok(RotateChooserPlugin {
             bands,
 
             rng: rand::thread_rng(),
@@ -40,7 +43,7 @@ impl<'a> RotateChooserPlugin<'a> {
             switcher: *props.get("type").unwrap_or(&"inc"),
             ignore_last: props
                 .get("ignore_last")
-                .unwrap_or(&"8")
+                .unwrap_or(&"DEFAULT")
                 .parse()
                 .unwrap_or(8),
 
@@ -49,7 +52,7 @@ impl<'a> RotateChooserPlugin<'a> {
             init_band_idx,
 
             band_idx: None,
-        }
+        })
     }
 }
 

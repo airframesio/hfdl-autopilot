@@ -33,6 +33,7 @@ pub struct GroundStationStat {
 pub struct GroundStationInfo {
     pub name: String,
     pub position: Vec<f64>,
+    pub assigned_bands: Vec<u32>,
     pub active_bands: Vec<u32>,
 
     pub last_heard: Option<Instant>,
@@ -69,6 +70,7 @@ pub fn gs_info_from_config(config: &Config) -> GroundStationMap {
             GroundStationInfo {
                 name: gs_info.name.clone(),
                 position: vec![gs_info.lon, gs_info.lat],
+                assigned_bands: gs_info.assigned.clone(),
                 active_bands: vec![],
                 last_heard: None,
             },

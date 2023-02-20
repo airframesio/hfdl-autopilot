@@ -9,8 +9,11 @@ pub struct SingleChooserPlugin<'a> {
 }
 
 impl<'a> SingleChooserPlugin<'a> {
-    pub fn new(bands: &'a FrequencyBandMap, props: &'a HashMap<&'a str, &'a str>) -> Self {
-        SingleChooserPlugin { bands, props }
+    pub fn new(
+        bands: &'a FrequencyBandMap,
+        props: &'a HashMap<&'a str, &'a str>,
+    ) -> Result<Self, String> {
+        Ok(SingleChooserPlugin { bands, props })
     }
 }
 

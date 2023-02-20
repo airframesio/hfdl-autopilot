@@ -49,15 +49,10 @@ async fn main() -> io::Result<()> {
 
     let mut shared_state = SharedState::new(&config);
 
-    let mut plugin = match chooser::get(
-        name,
-        &config.info.bands,
-        &props,
-        shared_state.gs_info.clone(),
-    ) {
-        Some(plugin) => plugin,
-        None => {
-            error!("Invalid plugin name: {}", name);
+    let mut plugin = match chooser::get(name, &config, &props, shared_state.gs_info.clone()) {
+        Ok(plugin) => plugin,
+        Err(e) => {
+            error!("PLUGIN INIT[{}]: {}", name, e);
             return Ok(());
         }
     };
