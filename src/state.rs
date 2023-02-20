@@ -10,7 +10,16 @@ use serde_json::Value;
 use std::time::Instant;
 
 pub type FrequencyStats = DashMap<u32, u32>;
+pub type GroundStationStats = DashMap<u8, GroundStationStat>;
 pub type GroundStationMap = DashMap<u8, GroundStationInfo>;
+
+#[derive(Debug)]
+pub struct GroundStationStat {
+    pub name: String,
+    pub to_msgs: u64,
+    pub from_msgs: u64,
+    // TOOD:  last_heard_ts
+}
 
 #[derive(Debug)]
 pub struct GroundStationInfo {
@@ -89,6 +98,7 @@ pub struct SharedState {
     bands: FrequencyBandMap,
 
     pub gs_info: Data<GroundStationMap>,
+    pub gs_stats: Data<GroundStationStats>,
     pub flight_posrpt: Data<PositionReportsByFlightMap>,
     pub freq_stats: Data<FrequencyStats>,
 }
@@ -99,6 +109,7 @@ impl SharedState {
             bands: config.info.bands.clone(),
 
             gs_info: Data::new(gs_info_from_config(config)),
+            gs_stats: Data::new(GroundStationStats::new()),
             flight_posrpt: Data::new(PositionReportsByFlightMap::new()),
             freq_stats: Data::new(FrequencyStats::new()),
         }
@@ -150,7 +161,7 @@ impl SharedState {
             }
 
             info!(
-                "SPDU[{}]({:.1}) {:>4}bps  {} -> ALL  Update Active Freqs",
+                " SPDU[{}]({:.1}) {:>4}bps  {} -> ALL  Update Active Freqs",
                 frame.hfdl.frequency(),
                 frame.hfdl.sig_level,
                 frame.hfdl.bit_rate,
@@ -167,20 +178,20 @@ impl SharedState {
             if let Some(ref hfnpdu) = lpdu.hfnpdu {
                 if let Some(ref acars) = hfnpdu.acars {
                     info!(
-                        "ACARS[{}]({:.1}) {:>4}bps  {} -> {}  {:<2} {:1} {:1} {:<7}",
+                        "ACARS[{}]({:.1}) {:>4}bps  {} -> {}  {:<7} {:<2} {:1} {:1}",
                         frame.hfdl.frequency(),
                         frame.hfdl.sig_level,
                         frame.hfdl.bit_rate,
                         lpdu.source(),
                         lpdu.destination(),
+                        acars.flight.as_ref().unwrap_or(&" ".to_string()),
                         acars.label,
                         acars.blk_id,
-                        acars.ack,
-                        acars.flight.as_ref().unwrap_or(&" ".to_string()),
+                        acars.ack
                     );
                 } else {
                     info!(
-                        "HFNPDU[{}]({:.1}) {:>4}bps  {} -> {}  {}",
+                        "  HFN[{}]({:.1}) {:>4}bps  {} -> {}  {}",
                         frame.hfdl.frequency(),
                         frame.hfdl.sig_level,
                         frame.hfdl.bit_rate,
@@ -191,7 +202,7 @@ impl SharedState {
                 }
             } else {
                 info!(
-                    "LPDU[{}]({:.1}) {:>4}bps  {} -> {}  {}",
+                    " LPDU[{}]({:.1}) {:>4}bps  {} -> {}  {}",
                     frame.hfdl.frequency(),
                     frame.hfdl.sig_level,
                     frame.hfdl.bit_rate,
