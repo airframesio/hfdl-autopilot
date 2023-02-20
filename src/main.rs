@@ -73,6 +73,7 @@ async fn main() -> io::Result<()> {
             config.host, config.port
         );
 
+        let session = shared_state.session.clone();
         let gs_info = shared_state.gs_info.clone();
         let gs_stats = shared_state.gs_stats.clone();
         let flight_posrpt = shared_state.flight_posrpt.clone();
@@ -81,11 +82,13 @@ async fn main() -> io::Result<()> {
         tokio::spawn(async move {
             let server = HttpServer::new(move || {
                 App::new()
+                    .app_data(session.clone())
                     .app_data(gs_info.clone())
                     .app_data(gs_stats.clone())
                     .app_data(flight_posrpt.clone())
                     .app_data(freq_stats.clone())
                     .route("/", web::get().to(http::web_index))
+                    .route("/api/session", web::get().to(http::api_session_list))
                     .route("/api/ground-stations", web::get().to(http::api_gs_list))
                     .route(
                         "/api/ground-stations/stats",
@@ -125,6 +128,8 @@ async fn main() -> io::Result<()> {
                 return Ok(());
             }
         };
+
+        shared_state.update_current_band(&band);
 
         let bandwidth = match band.iter().max().unwrap_or(&0) - band.iter().min().unwrap_or(&0) {
             d if d >= 452 && d < 764 => "768000",

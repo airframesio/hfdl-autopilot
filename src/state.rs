@@ -9,6 +9,7 @@ use serde::ser;
 use serde::ser::SerializeStruct;
 use serde::Serialize;
 use serde_json::Value;
+use std::sync::RwLock;
 use std::time::Instant;
 
 pub type FrequencyStats = DashMap<u32, u32>;
@@ -47,6 +48,12 @@ impl ser::Serialize for GroundStationInfo {
         )?;
         state.end()
     }
+}
+
+#[derive(Debug, Serialize)]
+pub struct SessionState {
+    band: u32,
+    freqs: Vec<u32>,
 }
 
 pub fn gs_info_from_config(config: &Config) -> GroundStationMap {
@@ -114,6 +121,8 @@ pub struct SharedState {
     spdu_timeout: u64,
     ac_timeout: u64,
 
+    pub session: Data<RwLock<SessionState>>,
+
     pub gs_info: Data<GroundStationMap>,
     pub gs_stats: Data<GroundStationStats>,
     pub flight_posrpt: Data<PositionReportsByFlightMap>,
@@ -126,6 +135,11 @@ impl SharedState {
             bands: config.info.bands.clone(),
             spdu_timeout: config.spdu_timeout,
             ac_timeout: config.ac_timeout,
+
+            session: Data::new(RwLock::new(SessionState {
+                band: 0,
+                freqs: vec![],
+            })),
 
             gs_info: Data::new(gs_info_from_config(config)),
             gs_stats: Data::new(gs_stats_from_config(&config)),
@@ -156,6 +170,16 @@ impl SharedState {
 
         for stale_flight in stale_flights.iter() {
             self.flight_posrpt.remove(stale_flight);
+        }
+    }
+
+    pub fn update_current_band(&mut self, freqs: &Vec<u32>) {
+        if freqs.len() > 0 {
+            if let Some(band) = self.freq_to_band(freqs[0] as f64) {
+                let mut session = self.session.write().unwrap();
+                session.band = band;
+                session.freqs = freqs.clone();
+            }
         }
     }
 
@@ -201,12 +225,12 @@ impl SharedState {
             }
 
             info!(
-                " SPDU[{}]({:.1}) {:>4}  {:>13} -> {:<13}  Update Active Freqs",
+                " SPDU[{}]({:.1}) {:>4}  {:>13} -> {:<13}  [Update GS Freqs]",
                 frame.hfdl.frequency(),
                 frame.hfdl.sig_level,
                 frame.hfdl.bit_rate,
                 spdu.source(),
-                "Broadcast"
+                "BROADCAST"
             );
         } else if let Some(ref lpdu) = frame.hfdl.lpdu {
             if lpdu.src.entity_name.is_some() {
@@ -239,7 +263,7 @@ impl SharedState {
                     );
                 } else {
                     info!(
-                        "HFNPD[{}]({:.1}) {:>4}  {:>13} -> {:<13}  {}",
+                        "HFNPD[{}]({:.1}) {:>4}  {:>13} -> {:<13}  [{}]",
                         frame.hfdl.frequency(),
                         frame.hfdl.sig_level,
                         frame.hfdl.bit_rate,
@@ -286,31 +310,34 @@ impl SharedState {
 
                     if hfnpdu.flight_id.is_some() && hfnpdu.pos.is_some() {
                         let pos = hfnpdu.pos.as_ref().unwrap();
-                        let report = PositionReport {
-                            position: vec![pos.lon, pos.lat],
-                            propagation,
-                        };
-
-                        if let Some(mut entry) = self
-                            .flight_posrpt
-                            .get_mut(hfnpdu.flight_id.as_ref().unwrap())
+                        if pos.lat > -90.0 && pos.lat < 90.0 && pos.lon > -180.0 && pos.lon < 180.0
                         {
-                            entry.positions.push(report);
-                            entry.last_heard = Instant::now();
-                        } else {
-                            self.flight_posrpt.insert(
-                                hfnpdu.flight_id.as_ref().unwrap().clone(),
-                                PositionReports {
-                                    last_heard: Instant::now(),
-                                    positions: vec![report],
-                                },
-                            );
+                            let report = PositionReport {
+                                position: vec![pos.lon, pos.lat],
+                                propagation,
+                            };
+
+                            if let Some(mut entry) = self
+                                .flight_posrpt
+                                .get_mut(hfnpdu.flight_id.as_ref().unwrap())
+                            {
+                                entry.positions.push(report);
+                                entry.last_heard = Instant::now();
+                            } else {
+                                self.flight_posrpt.insert(
+                                    hfnpdu.flight_id.as_ref().unwrap().clone(),
+                                    PositionReports {
+                                        last_heard: Instant::now(),
+                                        positions: vec![report],
+                                    },
+                                );
+                            }
                         }
                     }
                 }
             } else {
                 info!(
-                    " LPDU[{}]({:.1}) {:>4}  {:>13} -> {:<13}  {}",
+                    " LPDU[{}]({:.1}) {:>4}  {:>13} -> {:<13}  [{}]",
                     frame.hfdl.frequency(),
                     frame.hfdl.sig_level,
                     frame.hfdl.bit_rate,

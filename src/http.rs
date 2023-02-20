@@ -3,7 +3,7 @@ use actix_web::web::Data;
 use actix_web::{HttpRequest, HttpResponse};
 
 use crate::state::{
-    FrequencyStats, GroundStationMap, GroundStationStats, PositionReportsByFlightMap,
+    FrequencyStats, GroundStationMap, GroundStationStats, PositionReportsByFlightMap, SessionState,
 };
 
 pub async fn web_index(_req: HttpRequest) -> HttpResponse {
@@ -34,6 +34,14 @@ pub async fn api_freq_stats(req: HttpRequest) -> HttpResponse {
     HttpResponse::Ok()
         .content_type(ContentType::json())
         .body(serde_json::to_string(&freq_stats).unwrap())
+}
+
+pub async fn api_session_list(req: HttpRequest) -> HttpResponse {
+    let session = req.app_data::<Data<SessionState>>().unwrap();
+
+    HttpResponse::Ok()
+        .content_type(ContentType::json())
+        .body(serde_json::to_string(&session).unwrap())
 }
 
 pub async fn api_flights_list(req: HttpRequest) -> HttpResponse {
