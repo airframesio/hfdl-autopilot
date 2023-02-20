@@ -93,8 +93,7 @@ pub struct PositionReport {
 
 #[derive(Debug)]
 pub struct PositionReports {
-    pub last_heard: Option<Instant>,
-
+    pub last_heard: Instant,
     pub positions: Vec<PositionReport>,
 }
 
@@ -105,10 +104,7 @@ impl ser::Serialize for PositionReports {
     {
         let mut state = serializer.serialize_struct("PositionReports", 2)?;
         state.serialize_field("positions", &self.positions)?;
-        state.serialize_field(
-            "age_in_secs",
-            &self.last_heard.map(|i| i.elapsed().as_secs()),
-        )?;
+        state.serialize_field("age_in_secs", &self.last_heard.elapsed().as_secs())?;
         state.end()
     }
 }
@@ -149,24 +145,17 @@ impl SharedState {
     }
 
     pub fn clean_up(&mut self) {
-        let stale_flights: Vec<u8> = self
-            .gs_info
+        let stale_flights: Vec<String> = self
+            .flight_posrpt
             .iter()
-            .filter(|x| {
-                x.value()
-                    .last_heard
-                    .unwrap_or(Instant::now())
-                    .elapsed()
-                    .as_secs()
-                    >= self.ac_timeout
-            })
-            .map(|x| *x.key())
+            .filter(|x| x.value().last_heard.elapsed().as_secs() >= self.ac_timeout)
+            .map(|x| x.key().to_string())
             .collect();
 
         info!("CLEAN UP: Removing stale flights => {:?}", stale_flights);
 
         for stale_flight in stale_flights.iter() {
-            self.gs_info.remove(stale_flight);
+            self.flight_posrpt.remove(stale_flight);
         }
     }
 
@@ -303,16 +292,25 @@ impl SharedState {
 
                     if hfnpdu.flight_id.is_some() && hfnpdu.pos.is_some() {
                         let pos = hfnpdu.pos.as_ref().unwrap();
+                        let report = PositionReport {
+                            position: vec![pos.lon, pos.lat],
+                            propagation,
+                        };
 
                         if let Some(mut entry) = self
                             .flight_posrpt
                             .get_mut(hfnpdu.flight_id.as_ref().unwrap())
                         {
-                            entry.positions.push(PositionReport {
-                                position: vec![pos.lon, pos.lat],
-                                propagation,
-                            });
-                            entry.last_heard = Some(Instant::now());
+                            entry.positions.push(report);
+                            entry.last_heard = Instant::now();
+                        } else {
+                            self.flight_posrpt.insert(
+                                hfnpdu.flight_id.as_ref().unwrap().clone(),
+                                PositionReports {
+                                    last_heard: Instant::now(),
+                                    positions: vec![report],
+                                },
+                            );
                         }
                     }
                 }
