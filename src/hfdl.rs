@@ -44,7 +44,7 @@ pub struct GroundStation {
 #[allow(dead_code)]
 #[derive(Deserialize, Debug)]
 pub struct FrequencyData {
-    pub gs: GroundStation,
+    pub gs: Entity,
     pub listening_on_freqs: Vec<Frequency>,
     pub heard_on_freqs: Vec<Frequency>,
 }
@@ -123,15 +123,15 @@ impl LPDU {
             if let Some(ref acars) = hfnpdu.acars {
                 return format!("REG {} (AC)", acars.reg);
             } else if let Some(ref flight_id) = hfnpdu.flight_id {
-                return format!("FLIGHT {} (AC)", flight_id);
+                return format!("FLT {} (AC)", flight_id);
             }
         }
 
         if let Some(ac_info) = &self.ac_info {
-            return format!("ICAO {} (AC)", ac_info.icao);
+            return format!("HEX {} (AC)", ac_info.icao);
         }
 
-        format!("ID{} (AC)", entity.id)
+        format!("ID {} (AC)", entity.id)
     }
 
     pub fn source(&self) -> String {
