@@ -118,20 +118,20 @@ pub struct LPDU {
 impl LPDU {
     fn fmt_entity(&self, entity: &Entity) -> String {
         if let Some(name) = &entity.entity_name {
-            return name.clone();
+            return name.split(",").next().unwrap_or(name).to_string();
         } else if let Some(ref hfnpdu) = self.hfnpdu {
             if let Some(ref acars) = hfnpdu.acars {
-                return format!("Tail[{:>7}]", acars.reg);
+                return format!("Reg[{:>7}]", acars.reg);
             } else if let Some(ref flight_id) = hfnpdu.flight_id {
-                return format!(" Flt[{:>7}]", flight_id);
+                return format!("Flt[{:>7}]", flight_id);
             }
         }
 
         if let Some(ac_info) = &self.ac_info {
-            return format!("Icao[{:>7}]", ac_info.icao);
+            return format!("Hex[{:>7}]", ac_info.icao);
         }
 
-        format!("ACId[{:07}]", entity.id)
+        format!("Aci[{:>7}]", entity.id)
     }
 
     pub fn source(&self) -> String {
@@ -156,8 +156,9 @@ pub struct SPDU {
 }
 
 impl SPDU {
-    pub fn source(&self) -> &str {
-        &self.src.entity_name.as_ref().unwrap()
+    pub fn source(&self) -> String {
+        let name = self.src.entity_name.as_ref().unwrap().clone();
+        name.split(",").next().unwrap_or(&name).to_string()
     }
 }
 

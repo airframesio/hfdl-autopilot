@@ -201,18 +201,12 @@ impl SharedState {
             }
 
             info!(
-                " SPDU[{}]({:.1}) {:>4}bps  {} -> ALL  Update Active Freqs",
+                " SPDU[{}]({:.1}) {:>4}  {:>13} -> {:<13}  Update Active Freqs",
                 frame.hfdl.frequency(),
                 frame.hfdl.sig_level,
                 frame.hfdl.bit_rate,
-                spdu.source()
-            );
-            info!(
-                "    GS => {:?}",
-                spdu.gs_status
-                    .iter()
-                    .map(|x| x.gs.entity_name.as_ref().unwrap())
-                    .collect::<Vec<&String>>()
+                spdu.source(),
+                "Broadcast"
             );
         } else if let Some(ref lpdu) = frame.hfdl.lpdu {
             if lpdu.src.entity_name.is_some() {
@@ -232,7 +226,7 @@ impl SharedState {
             if let Some(ref hfnpdu) = lpdu.hfnpdu {
                 if let Some(ref acars) = hfnpdu.acars {
                     info!(
-                        "ACARS[{}]({:.1}) {:>4}bps  {} -> {}  {:<7} {:<2} {:1} {:1}",
+                        "ACARS[{}]({:.1}) {:>4}  {:>13} -> {:<13}  {:<7} {:<2} {:1} {:1}",
                         frame.hfdl.frequency(),
                         frame.hfdl.sig_level,
                         frame.hfdl.bit_rate,
@@ -245,7 +239,7 @@ impl SharedState {
                     );
                 } else {
                     info!(
-                        "HFNPD[{}]({:.1}) {:>4}bps  {} -> {}  {}",
+                        "HFNPD[{}]({:.1}) {:>4}  {:>13} -> {:<13}  {}",
                         frame.hfdl.frequency(),
                         frame.hfdl.sig_level,
                         frame.hfdl.bit_rate,
@@ -316,7 +310,7 @@ impl SharedState {
                 }
             } else {
                 info!(
-                    " LPDU[{}]({:.1}) {:>4}bps  {} -> {}  {}",
+                    " LPDU[{}]({:.1}) {:>4}  {:>13} -> {:<13}  {}",
                     frame.hfdl.frequency(),
                     frame.hfdl.sig_level,
                     frame.hfdl.bit_rate,

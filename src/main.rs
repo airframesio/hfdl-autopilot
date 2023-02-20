@@ -126,17 +126,21 @@ async fn main() -> io::Result<()> {
             }
         };
 
-        info!("New session started: band={:?}", band);
-
         let bandwidth = match band.iter().max().unwrap_or(&0) - band.iter().min().unwrap_or(&0) {
-            d if d > 384 && d <= 512 => "512000",
-            d if d > 256 && d <= 384 => "384000",
-            d if d <= 256 => "256000",
+            d if d >= 452 && d < 764 => "768000",
+            d if d >= 380 && d < 452 => "456000",
+            d if d > 252 && d < 380 => "384000",
+            d if d <= 252 => "256000",
             _ => {
                 error!("Bandwidth calculation failed: {:?}", band);
                 return Ok(());
             }
         };
+
+        info!(
+            "New session started: sample_rate={} band={:?}",
+            bandwidth, band
+        );
 
         let mut proc = match Command::new(config.bin.clone())
             .stdout(Stdio::piped())
