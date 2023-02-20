@@ -101,8 +101,13 @@ impl<'a> ChooserPlugin for TrackerChooserPlugin<'a> {
         let mut bands: Vec<u32> = (if gs.active_bands.len() == 0
             || gs.last_heard.unwrap_or(Instant::now()).elapsed().as_secs() > self.spdu_timeout
         {
+            info!(
+                "No or stale active bands found. Using assigned bands for target: {:?}",
+                gs.assigned_bands
+            );
             gs.assigned_bands.clone()
         } else {
+            info!("Found fresh active bands for target: {:?}", gs.active_bands);
             gs.active_bands.clone()
         })
         .into_iter()
