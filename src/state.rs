@@ -19,6 +19,7 @@ pub type GroundStationMap = DashMap<u8, GroundStationInfo>;
 #[derive(Debug, Serialize)]
 pub struct GroundStationStat {
     pub name: String,
+    pub location: Vec<f64>,
 
     pub to_msgs: u64,
     pub to_freqs: Vec<u32>,
@@ -87,6 +88,7 @@ pub fn gs_stats_from_config(config: &Config) -> GroundStationStats {
             gs_info.id,
             GroundStationStat {
                 name: gs_info.name.clone(),
+                location: vec![gs_info.lat, gs_info.lon],
                 to_msgs: 0,
                 to_freqs: vec![],
                 from_msgs: 0,
