@@ -69,7 +69,7 @@ pub fn gs_info_from_config(config: &Config) -> GroundStationMap {
             gs_info.id,
             GroundStationInfo {
                 name: gs_info.name.clone(),
-                position: vec![gs_info.lon, gs_info.lat],
+                position: vec![gs_info.lat, gs_info.lon],
                 assigned_bands: gs_info.assigned.clone(),
                 active_bands: vec![],
                 last_heard: None,
@@ -345,7 +345,7 @@ impl SharedState {
                         if pos.lat > -90.0 && pos.lat < 90.0 && pos.lon > -180.0 && pos.lon < 180.0
                         {
                             let report = PositionReport {
-                                position: vec![pos.lon, pos.lat],
+                                position: vec![pos.lat, pos.lon],
                                 freq: frame.hfdl.freq,
                                 propagation,
                             };
