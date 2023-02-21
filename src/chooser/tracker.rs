@@ -122,11 +122,11 @@ impl<'a> ChooserPlugin for TrackerChooserPlugin<'a> {
         }
 
         bands.shuffle(&mut self.rng);
-        let band = bands[0];
+        self.current_band = bands[0];
 
         self.bands
-            .get(&band)
-            .ok_or(format!("Invalid band: {}", band))
+            .get(&self.current_band)
+            .ok_or(format!("Invalid band: {}", self.current_band))
     }
 
     fn on_recv_frame(&mut self, frame: &serde_json::Value) -> bool {
