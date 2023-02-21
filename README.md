@@ -57,3 +57,4 @@ By default, `hfdl-autopilot` will expose a simple REST API on port 7270. This AP
 * `/api/freq-stats`
 * `/api/flights`
 * `/api/flight/{CALLSIGN}`
+* `/api/session`
