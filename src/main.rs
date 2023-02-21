@@ -94,6 +94,10 @@ async fn main() -> io::Result<()> {
                     )
                     .route("/api/freq-stats", web::get().to(http::api_freq_stats))
                     .route("/api/flights", web::get().to(http::api_flights_list))
+                    .route(
+                        "/api/flight/{callsign}",
+                        web::get().to(http::api_flights_detail),
+                    )
             })
             .bind((server_host, server_port))
             .unwrap()

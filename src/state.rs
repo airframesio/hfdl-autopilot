@@ -103,15 +103,16 @@ pub type PositionReportsByFlightMap = DashMap<String, PositionReports>;
 
 #[derive(Debug, Serialize)]
 pub struct PropagationReport {
-    id: u8,
-    name: String,
-    location: Vec<f64>,
-    bands: Vec<u32>,
+    pub id: u8,
+    pub name: String,
+    pub location: Vec<f64>,
+    pub bands: Vec<u32>,
 }
 
 #[derive(Debug, Serialize)]
 pub struct PositionReport {
     pub position: Vec<f64>,
+    pub freq: u32,
     pub propagation: Vec<PropagationReport>,
 }
 
@@ -345,6 +346,7 @@ impl SharedState {
                         {
                             let report = PositionReport {
                                 position: vec![pos.lon, pos.lat],
+                                freq: frame.hfdl.freq,
                                 propagation,
                             };
 

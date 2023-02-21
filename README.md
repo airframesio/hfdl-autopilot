@@ -2,7 +2,7 @@
 Dynamic `dumphfdl` wrapper that changes listening frequencies based off of HFDL activity.
 
 ### TODO
-- [ ] 
+- [ ] Front-end UI 
 - [x] Derive bands from SPDU via provided system table config instead of current shortcut.
 - [x] Allow more `dumphfdl` command line argument passthrough
 - [ ] <strike>Allow more arguments to be configurable via environment variables</strike>
