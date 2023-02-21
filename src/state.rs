@@ -341,36 +341,42 @@ impl SharedState {
                     }
 
                     if hfnpdu.flight_id.is_some() && hfnpdu.pos.is_some() {
-                        let pos = hfnpdu.pos.as_ref().unwrap();
-                        if pos.lat > -90.0 && pos.lat < 90.0 && pos.lon > -180.0 && pos.lon < 180.0
-                        {
-                            let report = PositionReport {
-                                position: vec![pos.lat, pos.lon],
-                                freq: frame.hfdl.freq,
-                                propagation,
-                            };
+                        let mut flight_id = hfnpdu.flight_id.as_ref().unwrap().clone();
+                        if flight_id.len() == 0 {
+                            flight_id = "EMPTY_CALLSIGN".to_string();
+                        }
 
-                            if let Some(mut entry) = self
-                                .flight_posrpt
-                                .get_mut(hfnpdu.flight_id.as_ref().unwrap())
-                            {
-                                if !entry
+                        let pos = hfnpdu.pos.as_ref().unwrap();
+                        let pos_is_valid = pos.lat > -90.0
+                            && pos.lat < 90.0
+                            && pos.lon > -180.0
+                            && pos.lon < 180.0;
+
+                        let report = PositionReport {
+                            position: vec![pos.lat, pos.lon],
+                            freq: frame.hfdl.freq,
+                            propagation,
+                        };
+
+                        if let Some(mut entry) = self.flight_posrpt.get_mut(&flight_id) {
+                            if pos_is_valid
+                                && !entry
                                     .positions
                                     .iter()
                                     .any(|x| x.position == report.position)
-                                {
-                                    entry.positions.push(report);
-                                    entry.last_heard = Instant::now();
-                                }
-                            } else {
-                                self.flight_posrpt.insert(
-                                    hfnpdu.flight_id.as_ref().unwrap().clone(),
-                                    PositionReports {
-                                        last_heard: Instant::now(),
-                                        positions: vec![report],
-                                    },
-                                );
+                            {
+                                entry.positions.push(report);
                             }
+
+                            entry.last_heard = Instant::now();
+                        } else {
+                            self.flight_posrpt.insert(
+                                flight_id,
+                                PositionReports {
+                                    last_heard: Instant::now(),
+                                    positions: if pos_is_valid { vec![report] } else { vec![] },
+                                },
+                            );
                         }
                     }
                 }
