@@ -89,7 +89,7 @@ async fn main() -> io::Result<()> {
                     .route("/api/session", web::get().to(http::api_session_list))
                     .route("/api/ground-stations", web::get().to(http::api_gs_list))
                     .route(
-                        "/api/ground-stations/stats",
+                        "/api/ground-station/stats",
                         web::get().to(http::api_gs_stats),
                     )
                     .route("/api/freq-stats", web::get().to(http::api_freq_stats))

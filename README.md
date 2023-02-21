@@ -53,7 +53,7 @@ Track messages to/from a specific ground station. Move on to a new band if inact
 ### Web API
 By default, `hfdl-autopilot` will expose a simple REST API on port 7270. This API allows users to query session state information such as flight position reports (via HFDL link layer), latest ground stations frequencies, and message statistics.
 * `/api/ground-stations`
-* `/api/ground-stations/stats`
+* `/api/ground-station/stats`
 * `/api/freq-stats`
 * `/api/flights`
 * `/api/flight/{CALLSIGN}`
