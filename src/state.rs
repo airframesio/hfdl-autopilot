@@ -17,17 +17,19 @@ pub type GroundStationStats = DashMap<u8, GroundStationStat>;
 pub type GroundStationMap = DashMap<u8, GroundStationInfo>;
 
 #[derive(Debug, Serialize)]
+pub struct EntityStat {
+    pub msgs: u64,
+    pub freqs: Vec<u32>,
+    pub last_heard: Option<DateTime<Utc>>,
+}
+
+#[derive(Debug, Serialize)]
 pub struct GroundStationStat {
     pub name: String,
     pub location: Vec<f64>,
 
-    pub to_msgs: u64,
-    pub to_freqs: Vec<u32>,
-
-    pub from_msgs: u64,
-    pub from_freqs: Vec<u32>,
-
-    pub last_heard: Option<DateTime<Utc>>,
+    pub to: EntityStat,
+    pub from: EntityStat,
 }
 
 #[derive(Debug)]
@@ -89,11 +91,16 @@ pub fn gs_stats_from_config(config: &Config) -> GroundStationStats {
             GroundStationStat {
                 name: gs_info.name.clone(),
                 location: vec![gs_info.lat, gs_info.lon],
-                to_msgs: 0,
-                to_freqs: vec![],
-                from_msgs: 0,
-                from_freqs: vec![],
-                last_heard: None,
+                to: EntityStat {
+                    msgs: 0,
+                    freqs: vec![],
+                    last_heard: None,
+                },
+                from: EntityStat {
+                    msgs: 0,
+                    freqs: vec![],
+                    last_heard: None,
+                },
             },
         );
     }
@@ -240,11 +247,11 @@ impl SharedState {
             }
 
             if let Some(mut entry) = self.gs_stats.get_mut(&spdu.src.id) {
-                entry.from_msgs += 1;
-                if !entry.from_freqs.iter().any(|&x| x == frame.hfdl.freq) {
-                    entry.from_freqs.push(frame.hfdl.freq);
+                entry.from.msgs += 1;
+                if !entry.from.freqs.iter().any(|&x| x == frame.hfdl.freq) {
+                    entry.from.freqs.push(frame.hfdl.freq);
                 }
-                entry.last_heard = Some(offset::Utc::now());
+                entry.from.last_heard = Some(offset::Utc::now());
             }
 
             info!(
@@ -258,21 +265,21 @@ impl SharedState {
         } else if let Some(ref lpdu) = frame.hfdl.lpdu {
             if lpdu.src.entity_name.is_some() {
                 if let Some(mut entry) = self.gs_stats.get_mut(&lpdu.src.id) {
-                    entry.from_msgs += 1;
-                    if !entry.from_freqs.iter().any(|&x| x == frame.hfdl.freq) {
-                        entry.from_freqs.push(frame.hfdl.freq);
+                    entry.from.msgs += 1;
+                    if !entry.from.freqs.iter().any(|&x| x == frame.hfdl.freq) {
+                        entry.from.freqs.push(frame.hfdl.freq);
                     }
-                    entry.last_heard = Some(offset::Utc::now());
+                    entry.from.last_heard = Some(offset::Utc::now());
                 }
             }
 
             if lpdu.dst.entity_name.is_some() {
                 if let Some(mut entry) = self.gs_stats.get_mut(&lpdu.dst.id) {
-                    entry.to_msgs += 1;
-                    if !entry.to_freqs.iter().any(|&x| x == frame.hfdl.freq) {
-                        entry.to_freqs.push(frame.hfdl.freq);
+                    entry.to.msgs += 1;
+                    if !entry.to.freqs.iter().any(|&x| x == frame.hfdl.freq) {
+                        entry.to.freqs.push(frame.hfdl.freq);
                     }
-                    entry.last_heard = Some(offset::Utc::now());
+                    entry.to.last_heard = Some(offset::Utc::now());
                 }
             }
 
