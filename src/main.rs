@@ -144,10 +144,7 @@ async fn main() -> io::Result<()> {
             }
         };
 
-        info!(
-            "New session started: sample_rate={} band={:?}",
-            bandwidth, band
-        );
+        info!("NEW SESSION: sample_rate={} band={:?}", bandwidth, band);
 
         let mut proc = match Command::new(config.bin.clone())
             .stdout(Stdio::piped())
