@@ -57,7 +57,7 @@ if __name__ == "__main__":
             freq = int(freq)
             for band in sorted(bands.keys()):
                 if -BANDWIDTH_LIMIT <= freq - bands[band][0] <= BANDWIDTH_LIMIT:
-                    bands[band] = sorted(bands[band] + [freq])
+                    bands[band] = sorted(set(bands[band] + [freq]))
                     break
             else:
                 band = int(freq / 1000.0)
