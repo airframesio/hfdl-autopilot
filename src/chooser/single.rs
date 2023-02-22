@@ -1,31 +1,29 @@
+use crate::{chooser::ChooserPlugin, config::FrequencyBandMap};
 use std::collections::HashMap;
-
-use serde_json::Value;
-
-use crate::chooser::ChooserPlugin;
-use crate::config::FrequencyBandMap;
 
 pub const NAME: &'static str = "single";
 
-pub struct SingleChooserPlugin {}
+pub struct SingleChooserPlugin<'a> {
+    bands: &'a FrequencyBandMap,
+    props: &'a HashMap<&'a str, &'a str>,
+}
 
-impl SingleChooserPlugin {
-    pub fn new() -> Self {
-        SingleChooserPlugin {}
+impl<'a> SingleChooserPlugin<'a> {
+    pub fn new(
+        bands: &'a FrequencyBandMap,
+        props: &'a HashMap<&'a str, &'a str>,
+    ) -> Result<Self, String> {
+        Ok(SingleChooserPlugin { bands, props })
     }
 }
 
-impl ChooserPlugin for SingleChooserPlugin {
-    fn choose<'a, 'b>(
-        &mut self,
-        bands: &'a FrequencyBandMap,
-        props: &'b HashMap<&str, &str>,
-    ) -> Result<&'a Vec<u32>, String> {
-        if !props.contains_key("band") {
+impl<'a> ChooserPlugin for SingleChooserPlugin<'a> {
+    fn choose(&mut self) -> Result<&'a Vec<u32>, String> {
+        if !self.props.contains_key("band") {
             return Err("Missing 'band' key in props".to_string());
         }
 
-        let band: u32 = match props.get("band").unwrap().parse() {
+        let band: u32 = match self.props.get("band").unwrap().parse() {
             Ok(band) => band,
             Err(e) => {
                 return Err(format!(
@@ -35,10 +33,12 @@ impl ChooserPlugin for SingleChooserPlugin {
             }
         };
 
-        bands.get(&band).ok_or(format!("Invalid band: {}", band))
+        self.bands
+            .get(&band)
+            .ok_or(format!("Invalid band: {}", band))
     }
 
-    fn on_update(&mut self, _frame: &Value) -> bool {
+    fn on_recv_frame(&mut self, _frame: &serde_json::Value) -> bool {
         false
     }
 

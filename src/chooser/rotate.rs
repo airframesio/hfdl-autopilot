@@ -1,108 +1,112 @@
+use crate::{chooser::ChooserPlugin, config::FrequencyBandMap};
 use log::*;
+use rand::rngs::ThreadRng;
 use rand::Rng;
-use serde_json::Value;
 use std::collections::HashMap;
-
-use crate::chooser::ChooserPlugin;
-use crate::config::FrequencyBandMap;
 
 pub const NAME: &'static str = "rotate";
 
-const MAX_MEMORY_ENTRIES: usize = 8;
+pub struct RotateChooserPlugin<'a> {
+    bands: &'a FrequencyBandMap,
 
-pub struct RotateChooserPlugin {
+    rng: ThreadRng,
+
+    switcher: &'a str,
+    ignore_last: usize,
+
+    band_keys: Vec<&'a u32>,
     recently_used: Vec<usize>,
+    init_band_idx: usize,
+
     band_idx: Option<usize>,
 }
 
-impl RotateChooserPlugin {
-    pub fn new() -> Self {
-        RotateChooserPlugin {
-            band_idx: None,
-            recently_used: vec![],
-        }
-    }
-}
-
-impl ChooserPlugin for RotateChooserPlugin {
-    fn choose<'a, 'b>(
-        &mut self,
+impl<'a> RotateChooserPlugin<'a> {
+    pub fn new(
         bands: &'a FrequencyBandMap,
-        props: &'b HashMap<&str, &str>,
-    ) -> Result<&'a Vec<u32>, String> {
+        props: &'a HashMap<&'a str, &'a str>,
+    ) -> Result<Self, String> {
         let mut band_keys: Vec<&u32> = bands.keys().into_iter().collect();
         band_keys.sort_unstable();
 
+        let start_band: u32 = props.get("start").unwrap_or(&"13").parse().unwrap_or(13);
+        let init_band_idx = band_keys
+            .iter()
+            .position(|&&x| x == start_band)
+            .unwrap_or(0);
+        let ignore_last = props
+            .get("ignore_last")
+            .unwrap_or(&"DEFAULT")
+            .parse()
+            .unwrap_or(8);
         let switcher = *props.get("type").unwrap_or(&"inc");
 
+        info!(
+            "Rotate settings: start={} switcher={} ignore_last={}",
+            start_band, switcher, ignore_last
+        );
+
+        Ok(RotateChooserPlugin {
+            bands,
+
+            rng: rand::thread_rng(),
+
+            switcher,
+            ignore_last,
+
+            band_keys,
+            recently_used: vec![],
+            init_band_idx,
+
+            band_idx: None,
+        })
+    }
+}
+
+impl<'a> ChooserPlugin for RotateChooserPlugin<'a> {
+    fn choose(&mut self) -> Result<&'a Vec<u32>, String> {
         if self.band_idx.is_none() {
-            let start: u32 = match props.get("start").unwrap_or(&"13").parse() {
-                Ok(start) => start,
-                Err(e) => {
-                    return Err(format!(
-                        "'start' key contains an invalid positive number: {}",
-                        e
-                    ))
-                }
-            };
-
-            self.band_idx = band_keys.iter().position(|&b| b == &start);
-            if self.band_idx.is_none() {
-                return Err(format!("'start' key value ({}) is not a valid band", start));
-            }
-
-            self.recently_used.push(self.band_idx.unwrap());
-        } else if switcher.eq("dec") {
-            info!("[dec]    current band_idx = {:?}", self.band_idx);
-
-            if self.band_idx.unwrap() == 0 {
-                self.band_idx = Some(band_keys.len() - 1);
-            } else {
-                self.band_idx = Some(self.band_idx.unwrap() - 1);
-            }
-
-            info!("[dec]    next band_idx = {:?}", self.band_idx);
-        } else if switcher.eq("random") {
-            let mut new_idx = self.band_idx.unwrap();
+            self.recently_used.push(self.init_band_idx);
+            self.band_idx = Some(self.init_band_idx);
+        } else if self.switcher.eq("random") {
             info!(
-                "[random] current band_idx = {:?}, recently_used = {:?}",
-                self.band_idx, self.recently_used
+                "[rotate](random) band_idx = {:?}, recently_used = {:?}, ignore_last = {}",
+                self.band_idx, self.recently_used, self.ignore_last
             );
 
-            while self
-                .recently_used
-                .iter()
-                .position(|&b| b == new_idx)
-                .is_some()
-            {
-                new_idx = rand::thread_rng().gen_range(0..(band_keys.len() - 1))
+            let mut new_idx = self.band_idx.unwrap();
+            while self.recently_used.iter().any(|&x| x == new_idx) {
+                new_idx = self.rng.gen_range(0..(self.band_keys.len() - 1));
             }
 
-            if self.recently_used.len() == MAX_MEMORY_ENTRIES {
+            if self.recently_used.len() >= self.ignore_last {
                 self.recently_used.remove(0);
             }
-
             self.recently_used.push(new_idx);
             self.band_idx = Some(new_idx);
-
-            info!("[random] next band_idx = {:?}", self.band_idx);
-        } else {
-            info!("[inc]    current band_idx = {:?}", self.band_idx);
-
-            if self.band_idx.unwrap() + 1 >= band_keys.len() {
-                self.band_idx = Some(0);
+        } else if self.switcher.eq("dec") {
+            let band_idx = self.band_idx.unwrap();
+            self.band_idx = Some(if band_idx == 0 {
+                self.band_keys.len() - 1
             } else {
-                self.band_idx = Some(self.band_idx.unwrap() + 1);
-            }
-
-            info!("[inc]    next band_idx = {:?}", self.band_idx);
+                band_idx - 1
+            });
+        } else {
+            let next_idx = self.band_idx.unwrap() + 1;
+            self.band_idx = Some(if next_idx >= self.band_keys.len() {
+                0
+            } else {
+                next_idx
+            });
         }
 
-        let band = band_keys[self.band_idx.unwrap()];
-        bands.get(&band).ok_or(format!("Invalid band: {}", band))
+        let band = self.band_keys[self.band_idx.unwrap()];
+        self.bands
+            .get(band)
+            .ok_or(format!("Invalid band: {}", band))
     }
 
-    fn on_update(&mut self, _frame: &Value) -> bool {
+    fn on_recv_frame(&mut self, _frame: &serde_json::Value) -> bool {
         false
     }
 
