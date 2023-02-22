@@ -255,12 +255,13 @@ impl SharedState {
             }
 
             info!(
-                " SPDU[{:>6}]({:>6}) {:>4}  {:>13} -> {:<13}  [Update GS Freqs]",
+                "SPDU [{:>6}]({:>6}) {:>4}  {:>13} -> {:<13}  [UpdateFreq] {}",
                 frame.hfdl.frequency(),
                 frame.hfdl.signal(),
                 frame.hfdl.bit_rate,
                 spdu.source(),
-                "BROADCAST"
+                "BROADCAST",
+                spdu.short(),
             );
         } else if let Some(ref lpdu) = frame.hfdl.lpdu {
             if lpdu.src.entity_name.is_some() {
@@ -286,26 +287,29 @@ impl SharedState {
             if let Some(ref hfnpdu) = lpdu.hfnpdu {
                 if let Some(ref acars) = hfnpdu.acars {
                     info!(
-                        "ACARS[{:>6}]({:>6}) {:>4}  {:>13} -> {:<13}  {:<7} {:<2} {:1} {:1}",
+                        "ACARS[{:>6}]({:>6}) {:>4}  {:>13} -> {:<13}  {:1} {:1} {:<2} {:<7} {:<3}{:1}",
                         frame.hfdl.frequency(),
                         frame.hfdl.signal(),
                         frame.hfdl.bit_rate,
                         lpdu.source(),
                         lpdu.destination(),
-                        acars.flight.as_ref().unwrap_or(&" ".to_string()),
-                        acars.label,
+                        acars.ack,
                         acars.blk_id,
-                        acars.ack
+                        acars.label,
+                        acars.flight.as_ref().unwrap_or(&" ".to_string()),
+                        acars.msg_num.as_ref().unwrap_or(&" ".to_string()),
+                        acars.msg_num_seq.as_ref().unwrap_or(&" ".to_string()),
                     );
                 } else {
                     info!(
-                        "HFNPD[{:>6}]({:>6}) {:>4}  {:>13} -> {:<13}  [{}]",
+                        "HFNPD[{:>6}]({:>6}) {:>4}  {:>13} -> {:<13}  [{}] {}",
                         frame.hfdl.frequency(),
                         frame.hfdl.signal(),
                         frame.hfdl.bit_rate,
                         lpdu.source(),
                         lpdu.destination(),
-                        hfnpdu.msg_type()
+                        hfnpdu.msg_type(),
+                        hfnpdu.short(),
                     );
 
                     let mut propagation: Vec<PropagationReport> = vec![];
@@ -352,7 +356,11 @@ impl SharedState {
                     if hfnpdu.flight_id.is_some() && hfnpdu.pos.is_some() {
                         let mut flight_id = hfnpdu.flight_id.as_ref().unwrap().clone();
                         if flight_id.len() == 0 {
-                            flight_id = "EMPTY_CALLSIGN".to_string();
+                            flight_id = format!(
+                                "{}#{}",
+                                lpdu.dst.entity_name.as_ref().unwrap_or(&"".to_string()),
+                                lpdu.src.id
+                            );
                         }
 
                         let pos = hfnpdu.pos.as_ref().unwrap();
@@ -391,13 +399,14 @@ impl SharedState {
                 }
             } else {
                 info!(
-                    " LPDU[{:>6}]({:>6}) {:>4}  {:>13} -> {:<13}  [{}]",
+                    "LPDU [{:>6}]({:>6}) {:>4}  {:>13} -> {:<13}  [{}] {}",
                     frame.hfdl.frequency(),
                     frame.hfdl.signal(),
                     frame.hfdl.bit_rate,
                     lpdu.source(),
                     lpdu.destination(),
-                    lpdu.msg_type()
+                    lpdu.msg_type(),
+                    lpdu.short(),
                 );
             }
         }
