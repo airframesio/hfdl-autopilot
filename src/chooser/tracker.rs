@@ -158,6 +158,7 @@ impl<'a> ChooserPlugin for TrackerChooserPlugin<'a> {
             if let Some(gs) = self.gs_info.get(&self.target_id) {
                 if gs.last_heard.is_some()
                     && gs.last_heard.unwrap().elapsed().as_secs() < self.spdu_timeout
+                    && !gs.active_bands.iter().any(|&x| x == self.current_band)
                 {
                     info!(
                         "New active bands for {}. Chooser elects to switch bands (no GS #{} activity seen thus far)",
