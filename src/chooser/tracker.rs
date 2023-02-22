@@ -90,9 +90,7 @@ impl<'a> TrackerChooserPlugin<'a> {
             current_band: 0,
         })
     }
-}
 
-impl<'a> TrackerChooserPlugin<'a> {
     fn frame_involves_target(&self, entity: &Entity) -> bool {
         entity.entity_type.eq_ignore_ascii_case("ground station") && entity.id == self.target_id
     }
