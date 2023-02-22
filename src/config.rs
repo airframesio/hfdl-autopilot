@@ -30,6 +30,7 @@ pub struct Config {
     pub timeout: u32,
     pub spdu_timeout: u64,
     pub ac_timeout: u64,
+    pub end_session_wait: u64,
     pub additional_args: Vec<String>,
 
     pub swarm: bool,
@@ -73,6 +74,7 @@ impl Config {
             timeout: args.timeout,
             spdu_timeout: args.spdu_timeout,
             ac_timeout: args.ac_timeout,
+            end_session_wait: args.end_session_wait,
             additional_args: args.additional_args.to_owned(),
 
             swarm: args.swarm,

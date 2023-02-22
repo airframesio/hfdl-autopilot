@@ -31,13 +31,17 @@ pub struct Args {
     #[arg(long, value_name = "PORT", default_value_t = 7270)]
     pub port: u16,
 
-    // Timeout in seconds before SPDU timeout and active frequencies are considered stale
+    /// Timeout in seconds before SPDU timeout and active frequencies are considered stale
     #[arg(long, value_name = "SECONDS", default_value_t = 900)]
     pub spdu_timeout: u64,
 
-    // Timeout in seconds before a flight is considered stale
+    /// Timeout in seconds before a flight is considered stale
     #[arg(long, value_name = "SECONDS", default_value_t = 1800)]
     pub ac_timeout: u64,
+
+    /// Seconds to wait after killing dumphfdl. Useful for letting SDRplay drivers perform clean up after a session ends
+    #[arg(long, value_name = "SECONDS", default_value_t = 0)]
+    pub end_session_wait: u64,
 
     /// Timeout in seconds to wait before switching HF bands
     #[arg(short, long, value_name = "SECONDS", default_value_t = 150)]

@@ -103,23 +103,31 @@ impl<'a> ChooserPlugin for TrackerChooserPlugin<'a> {
             None => return Err(format!("Invalid target GS ID: #{}", self.target_id)),
         };
 
-        let mut bands: Vec<u32> = (if gs.active_bands.len() == 0
+        let active_bands: Vec<u32> = gs
+            .active_bands
+            .clone()
+            .into_iter()
+            .filter(|&x| x != self.current_band)
+            .collect();
+
+        let mut bands: Vec<u32> = if active_bands.is_empty()
             || gs.last_heard.unwrap_or(Instant::now()).elapsed().as_secs() > self.spdu_timeout
         {
             info!(
                 "No or stale active bands found. Using assigned bands for target: {:?}",
                 gs.assigned_bands
             );
-            gs.assigned_bands.clone()
+            gs.assigned_bands
+                .clone()
+                .into_iter()
+                .filter(|&x| x != self.current_band)
+                .collect()
         } else {
             info!("Found fresh active bands for target: {:?}", gs.active_bands);
-            gs.active_bands.clone()
-        })
-        .into_iter()
-        .filter(|&x| x != self.current_band)
-        .collect();
+            active_bands
+        };
 
-        if bands.len() == 0 {
+        if bands.is_empty() {
             return Err(format!(
                 "Candidate bands is empty: last_heard={:?} spdu_timeout={}",
                 gs.last_heard, self.spdu_timeout

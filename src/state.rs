@@ -201,7 +201,7 @@ impl SharedState {
     }
 
     pub fn update_current_band(&mut self, freqs: &Vec<u32>) {
-        if freqs.len() > 0 {
+        if !freqs.is_empty() {
             if let Some(band) = self.freq_to_band(freqs[0] as f64) {
                 let mut session = self.session.write().unwrap();
                 session.band = band;
@@ -328,7 +328,7 @@ impl SharedState {
                                 );
                                 error!("         Most likely data consistency issue, make sure systable.json has proper bandwidth settings!");
                                 return;
-                            } else if heard_bands.len() > 0 {
+                            } else if !heard_bands.is_empty() {
                                 if let Some(gs) = self.gs_info.get(&info.gs.id) {
                                     propagation.push(PropagationReport {
                                         id: info.gs.id,
@@ -339,7 +339,7 @@ impl SharedState {
                                 }
 
                                 if let Some(mut entry) = self.gs_info.get_mut(&info.gs.id) {
-                                    if entry.active_bands.len() == 0
+                                    if entry.active_bands.is_empty()
                                         || (entry.last_heard.is_some()
                                             && entry.last_heard.unwrap().elapsed().as_secs()
                                                 >= self.spdu_timeout)
@@ -355,7 +355,7 @@ impl SharedState {
 
                     if hfnpdu.flight_id.is_some() && hfnpdu.pos.is_some() {
                         let mut flight_id = hfnpdu.flight_id.as_ref().unwrap().clone();
-                        if flight_id.len() == 0 {
+                        if flight_id.is_empty() {
                             flight_id = format!(
                                 "{}#{}",
                                 lpdu.dst.entity_name.as_ref().unwrap_or(&"".to_string()),
@@ -368,6 +368,27 @@ impl SharedState {
                             && pos.lat < 90.0
                             && pos.lon > -180.0
                             && pos.lon < 180.0;
+
+                        if lpdu.dst.entity_type.eq_ignore_ascii_case("ground station")
+                            && propagation.is_empty()
+                        {
+                            if let Some(gs) = self.gs_info.get(&lpdu.dst.id) {
+                                let freq = frame.hfdl.freq / 1000;
+                                let mut bands = vec![];
+
+                                match self.freq_to_band(freq as f64) {
+                                    Some(band) => bands.push(band),
+                                    None => error!("ERROR => freq_to_band failed for {}. Doesn't exist in any band", freq),
+                                }
+
+                                propagation.push(PropagationReport {
+                                    id: lpdu.dst.id,
+                                    name: gs.name.clone(),
+                                    location: gs.position.clone(),
+                                    bands,
+                                });
+                            }
+                        }
 
                         let report = PositionReport {
                             position: vec![pos.lat, pos.lon],
