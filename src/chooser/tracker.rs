@@ -152,6 +152,21 @@ impl<'a> ChooserPlugin for TrackerChooserPlugin<'a> {
             if self.frame_involves_target(&spdu.src) {
                 self.last_heard = Some(Instant::now());
             }
+
+            if self.last_heard.is_none() {
+                if let Some(gs) = self.gs_info.get(&self.target_id) {
+                    if gs.last_heard.is_some()
+                        && gs.last_heard.unwrap().elapsed().as_secs() < self.spdu_timeout
+                    {
+                        info!(
+                            "New SPDU w/ active bands for {}. Chooser elects to switch bands (no GS #{} activity seen thus far)", 
+                            gs.name, 
+                            self.target_id
+                        );
+                        return true;
+                    }
+                }
+            }
         }
 
         let elapsed_secs = self
