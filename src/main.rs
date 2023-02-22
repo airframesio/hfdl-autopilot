@@ -121,7 +121,6 @@ async fn main() -> io::Result<()> {
     info!("Starting listening session...");
     info!("");
 
-    let mut sessions = 0;
     let mut bad_child_reads = 0;
 
     while bad_child_reads < config.max_bad_child_reads {
@@ -146,18 +145,7 @@ async fn main() -> io::Result<()> {
             }
         };
 
-        if sessions > 0 && config.end_session_wait > 0 {
-            info!(
-                "Waiting {} seconds before starting new session",
-                config.end_session_wait
-            );
-            time::sleep(Duration::from_secs(config.end_session_wait)).await;
-        }
-
-        info!(
-            "NEW SESSION[{}]: sample_rate={} band={:?}",
-            sessions, bandwidth, band
-        );
+        info!("NEW SESSION: sample_rate={} band={:?}", bandwidth, band);
 
         let mut proc = match Command::new(config.bin.clone())
             .stdout(Stdio::piped())
@@ -246,9 +234,16 @@ async fn main() -> io::Result<()> {
 
         proc.kill().await?;
 
+        if bad_child_reads < config.max_bad_child_reads && config.end_session_wait > 0 {
+            info!(
+                "Waiting {} seconds before starting new session",
+                config.end_session_wait
+            );
+            time::sleep(Duration::from_secs(config.end_session_wait)).await;
+        }
+
         info!("Ending session...");
 
-        sessions += 1;
         shared_state.clean_up();
 
         info!("");
