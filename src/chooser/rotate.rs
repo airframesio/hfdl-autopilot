@@ -34,18 +34,25 @@ impl<'a> RotateChooserPlugin<'a> {
             .iter()
             .position(|&&x| x == start_band)
             .unwrap_or(0);
+        let ignore_last = props
+            .get("ignore_last")
+            .unwrap_or(&"DEFAULT")
+            .parse()
+            .unwrap_or(8);
+        let switcher = *props.get("type").unwrap_or(&"inc");
+
+        info!(
+            "Rotate settings: start={} switcher={} ignore_last={}",
+            start_band, switcher, ignore_last
+        );
 
         Ok(RotateChooserPlugin {
             bands,
 
             rng: rand::thread_rng(),
 
-            switcher: *props.get("type").unwrap_or(&"inc"),
-            ignore_last: props
-                .get("ignore_last")
-                .unwrap_or(&"DEFAULT")
-                .parse()
-                .unwrap_or(8),
+            switcher,
+            ignore_last,
 
             band_keys,
             recently_used: vec![],

@@ -90,8 +90,15 @@ impl fmt::Display for Config {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
-            "Config {{ bin={:?} timeout={}s args={:?} }}",
-            self.bin, self.timeout, self.additional_args
+            "Cfg[to={{m:{}s a:{}s s:{}s}} sw={} srv={}:{} bin={:?} args={:?}]",
+            self.timeout,
+            self.ac_timeout,
+            self.spdu_timeout,
+            if self.swarm { 1 } else { 0 },
+            self.host,
+            self.port,
+            self.bin,
+            self.additional_args
         )
     }
 }

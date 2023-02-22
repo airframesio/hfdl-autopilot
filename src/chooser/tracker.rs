@@ -65,6 +65,17 @@ impl<'a> TrackerChooserPlugin<'a> {
             }
         };
 
+        let last_heard_timeout = props
+            .get("last_heard_timeout")
+            .unwrap_or(&"DEFAULT")
+            .parse()
+            .unwrap_or((config.spdu_timeout / 3) as u64);
+
+        info!(
+            "Tracker settings: target_id={} last_heard_timeout={}s",
+            target_id, last_heard_timeout
+        );
+
         Ok(TrackerChooserPlugin {
             bands: &config.info.bands,
             gs_info,
@@ -72,12 +83,8 @@ impl<'a> TrackerChooserPlugin<'a> {
             rng: rand::thread_rng(),
 
             target_id,
+            last_heard_timeout,
             spdu_timeout: config.spdu_timeout,
-            last_heard_timeout: props
-                .get("last_heard_timeout")
-                .unwrap_or(&"DEFAULT")
-                .parse()
-                .unwrap_or((config.spdu_timeout / 3) as u64),
             last_heard: Instant::now(),
 
             current_band: 0,
