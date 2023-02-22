@@ -20,7 +20,7 @@ pub struct TrackerChooserPlugin<'a> {
     target_id: u8,
     spdu_timeout: u64,
     last_heard_timeout: u64,
-    last_heard: Instant,
+    last_heard: Option<Instant>,
 
     current_band: u32,
 }
@@ -85,7 +85,7 @@ impl<'a> TrackerChooserPlugin<'a> {
             target_id,
             last_heard_timeout,
             spdu_timeout: config.spdu_timeout,
-            last_heard: Instant::now(),
+            last_heard: None,
 
             current_band: 0,
         })
@@ -130,6 +130,7 @@ impl<'a> ChooserPlugin for TrackerChooserPlugin<'a> {
 
         bands.shuffle(&mut self.rng);
         self.current_band = bands[0];
+        self.last_heard = None;
 
         self.bands
             .get(&self.current_band)
@@ -147,15 +148,19 @@ impl<'a> ChooserPlugin for TrackerChooserPlugin<'a> {
 
         if let Some(lpdu) = msg.hfdl.lpdu {
             if self.frame_involves_target(&lpdu.dst) || self.frame_involves_target(&lpdu.src) {
-                self.last_heard = Instant::now();
+                self.last_heard = Some(Instant::now());
             }
         } else if let Some(spdu) = msg.hfdl.spdu {
             if self.frame_involves_target(&spdu.src) {
-                self.last_heard = Instant::now();
+                self.last_heard = Some(Instant::now());
             }
         }
 
-        let elapsed_secs = self.last_heard.elapsed().as_secs();
+        let elapsed_secs = self
+            .last_heard
+            .unwrap_or(Instant::now())
+            .elapsed()
+            .as_secs();
         let change_bands = elapsed_secs >= self.last_heard_timeout;
         if change_bands {
             info!(
