@@ -91,7 +91,7 @@ impl fmt::Display for SystablePartial {
 #[allow(dead_code)]
 #[derive(Deserialize, Debug)]
 pub struct PerfDataFreq {
-    pub id: u8,
+    pub id: u32,
     pub freq: Option<f64>,
 }
 
