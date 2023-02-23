@@ -32,6 +32,8 @@ pub struct Entity {
 
     #[serde(alias = "name")]
     pub entity_name: Option<String>,
+
+    pub ac_info: Option<AircraftInfo>,
 }
 
 #[allow(dead_code)]
@@ -195,15 +197,19 @@ impl LPDU {
             return name.split(",").next().unwrap_or(name).to_string();
         } else if let Some(ref hfnpdu) = self.hfnpdu {
             if let Some(ref flight_id) = hfnpdu.flight_id {
-                return format!("Flt[{:>7}]", flight_id);
+                return format!("F[{:>7}].{:03}", flight_id, entity.id);
+            } else if let Some(ref ac_info) = entity.ac_info {
+                return format!("I[{:>7}].{:03}", ac_info.icao, entity.id);
+            } else if let Some(ref acars) = hfnpdu.acars {
+                return format!("R[{:>7}].{:03}", acars.reg, entity.id);
             }
         }
 
         if let Some(ac_info) = &self.ac_info {
-            return format!("Hex[{:>7}]", ac_info.icao);
+            return format!("I[{:<7}].{:03}", ac_info.icao, entity.id);
         }
 
-        format!("Aci[{:>7}]", entity.id)
+        format!("U[       ].{:03}", entity.id)
     }
 
     pub fn source(&self) -> String {

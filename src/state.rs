@@ -255,12 +255,12 @@ impl SharedState {
             }
 
             info!(
-                "SPDU [{:>6}]({:>6}) {:>4}  {:>13} -> {:<13}  [UpdateFreq] {}",
+                "SPDU [{:>6}]({:>6}) {:>4}  {:>14} -> {:<14}  [UpdateFreq] {}",
                 frame.hfdl.frequency(),
                 frame.hfdl.signal(),
                 frame.hfdl.bit_rate,
                 spdu.source(),
-                "BROADCAST",
+                "[ BROADCAST ]",
                 spdu.short(),
             );
         } else if let Some(ref lpdu) = frame.hfdl.lpdu {
@@ -287,7 +287,7 @@ impl SharedState {
             if let Some(ref hfnpdu) = lpdu.hfnpdu {
                 if let Some(ref acars) = hfnpdu.acars {
                     info!(
-                        "ACARS[{:>6}]({:>6}) {:>4}  {:>13} -> {:<13}  {:1} {:1} {:<2} {:<7} {:<7} {:<3}{:1}",
+                        "ACARS[{:>6}]({:>6}) {:>4}  {:>14} -> {:<14}  {:1} {:1} {:<2} {:<7} {:<7} {:<3}{:1}",
                         frame.hfdl.frequency(),
                         frame.hfdl.signal(),
                         frame.hfdl.bit_rate,
@@ -303,7 +303,7 @@ impl SharedState {
                     );
                 } else {
                     info!(
-                        "HFNPD[{:>6}]({:>6}) {:>4}  {:>13} -> {:<13}  [{}] {}",
+                        "HFNPD[{:>6}]({:>6}) {:>4}  {:>14} -> {:<14}  [{}] {}",
                         frame.hfdl.frequency(),
                         frame.hfdl.signal(),
                         frame.hfdl.bit_rate,
@@ -426,7 +426,7 @@ impl SharedState {
                 }
             } else {
                 info!(
-                    "LPDU [{:>6}]({:>6}) {:>4}  {:>13} -> {:<13}  [{}] {}",
+                    "LPDU [{:>6}]({:>6}) {:>4}  {:>14} -> {:<14}  [{}] {}",
                     frame.hfdl.frequency(),
                     frame.hfdl.signal(),
                     frame.hfdl.bit_rate,
