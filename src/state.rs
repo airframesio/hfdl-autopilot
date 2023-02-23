@@ -358,7 +358,7 @@ impl SharedState {
                         let flight_id = {
                             let callsign = hfnpdu.flight_id.as_ref().unwrap();
                             format!(
-                                "{}:GS{:02}#{}",
+                                "{}:GS{:02}{}",
                                 if callsign.is_empty() {
                                     "NO_CALLSIGN"
                                 } else {
