@@ -287,7 +287,7 @@ impl SharedState {
             if let Some(ref hfnpdu) = lpdu.hfnpdu {
                 if let Some(ref acars) = hfnpdu.acars {
                     info!(
-                        "ACARS[{:>6}]({:>6}) {:>4}  {:>13} -> {:<13}  {:1} {:1} {:<2} {:<7} {:<3}{:1}",
+                        "ACARS[{:>6}]({:>6}) {:>4}  {:>13} -> {:<13}  {:1} {:1} {:<2} {:<7} {:<7} {:<3}{:1}",
                         frame.hfdl.frequency(),
                         frame.hfdl.signal(),
                         frame.hfdl.bit_rate,
@@ -296,6 +296,7 @@ impl SharedState {
                         acars.ack,
                         acars.blk_id,
                         acars.label,
+                        acars.reg,
                         acars.flight.as_ref().unwrap_or(&" ".to_string()),
                         acars.msg_num.as_ref().unwrap_or(&" ".to_string()),
                         acars.msg_num_seq.as_ref().unwrap_or(&" ".to_string()),
@@ -354,14 +355,19 @@ impl SharedState {
                     }
 
                     if hfnpdu.flight_id.is_some() && hfnpdu.pos.is_some() {
-                        let mut flight_id = hfnpdu.flight_id.as_ref().unwrap().clone();
-                        if flight_id.is_empty() {
-                            flight_id = format!(
-                                "{}#{}",
-                                lpdu.dst.entity_name.as_ref().unwrap_or(&"".to_string()),
+                        let flight_id = {
+                            let callsign = hfnpdu.flight_id.as_ref().unwrap();
+                            format!(
+                                "{}:GS{:02}#{}",
+                                if callsign.is_empty() {
+                                    "NO_CALLSIGN"
+                                } else {
+                                    callsign
+                                },
+                                lpdu.dst.id,
                                 lpdu.src.id
-                            );
-                        }
+                            )
+                        };
 
                         let pos = hfnpdu.pos.as_ref().unwrap();
                         let pos_is_valid = pos.lat > -90.0

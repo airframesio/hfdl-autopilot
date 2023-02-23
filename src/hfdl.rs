@@ -194,9 +194,7 @@ impl LPDU {
         if let Some(name) = &entity.entity_name {
             return name.split(",").next().unwrap_or(name).to_string();
         } else if let Some(ref hfnpdu) = self.hfnpdu {
-            if let Some(ref acars) = hfnpdu.acars {
-                return format!("Reg[{:>7}]", acars.reg);
-            } else if let Some(ref flight_id) = hfnpdu.flight_id {
+            if let Some(ref flight_id) = hfnpdu.flight_id {
                 return format!("Flt[{:>7}]", flight_id);
             }
         }
