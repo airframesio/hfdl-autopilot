@@ -6,9 +6,12 @@ import sys
 
 class EchoServerHandler(socketserver.BaseRequestHandler):
   def handle(self):
-    data = self.request.recv(8192).decode("utf-8")
-    sys.stdout.write(data)
-    sys.stdout.flush()
+    data = "INITIAL"
+    
+    while len(data) > 0:
+      data = self.request.recv(8192).decode("utf-8")
+      sys.stdout.write(data)
+      sys.stdout.flush()
     
 if __name__ == "__main__":
   if "--exit" in sys.argv[1 : ]:

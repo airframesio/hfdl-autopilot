@@ -8,18 +8,18 @@ import time
 
 
 def tx_thread(c1: queue.Queue):
+    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM, socket.IPPROTO_TCP)
+    s.connect(("localhost", 9000))
 
     line = "INITIAL"
     while len(line) > 0:
-        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM, socket.IPPROTO_TCP)
-        s.connect(("localhost", 9000))
 
         line = ch.get()
         s.sendall(line.encode("utf-8"))
 
-        time.sleep(0.15)
-        
-        s.close()
+        time.sleep(0.01)
+
+    s.close()        
 
 if __name__ == "__main__":
     ch = queue.Queue(maxsize=0)
