@@ -272,6 +272,22 @@ impl SharedState {
                     }
                     entry.from.last_heard = Some(offset::Utc::now());
                 }
+
+                if let Some(mut entry) = self.gs_info.get_mut(&lpdu.src.id) {
+                    if entry.active_bands.is_empty()
+                        || (entry.last_heard.is_some()
+                            && entry.last_heard.unwrap().elapsed().as_secs() >= self.spdu_timeout)
+                    {
+                        entry.active_bands = if let Some(band) =
+                            self.freq_to_band((frame.hfdl.freq / 1000) as f64)
+                        {
+                            vec![band]
+                        } else {
+                            vec![]
+                        };
+                        entry.last_heard = Some(Instant::now());
+                    }
+                }
             }
 
             if lpdu.dst.entity_name.is_some() {
