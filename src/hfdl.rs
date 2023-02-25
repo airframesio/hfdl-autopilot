@@ -206,7 +206,7 @@ impl LPDU {
         }
 
         if let Some(ac_info) = &self.ac_info {
-            return format!("I[{:<7}].{:03}", ac_info.icao, entity.id);
+            return format!("I[{:>7}].{:03}", ac_info.icao, entity.id);
         }
 
         format!("U[       ].{:03}", entity.id)
