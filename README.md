@@ -28,6 +28,12 @@ hfdl-autopilot --bin /usr/local/bin/dumphfdl --sys-table /usr/local/etc/systable
 ```
 
 ### Modes
+#### `schedule`
+Schedule when band changes should occur.
+```
+--chooser schedule:7:00=21,19:00=8
+```
+
 #### `single`
 Only stay within a single change and never change. This is the same as running `dumphfdl` normally. The only advantage this offers is the automatic grouping of frequencies within a 256-384 KHz "bands".
 ```

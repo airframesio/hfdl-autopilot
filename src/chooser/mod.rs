@@ -5,6 +5,7 @@ use serde_json::Value;
 use std::collections::HashMap;
 
 mod rotate;
+mod schedule;
 mod single;
 mod tracker;
 
@@ -36,6 +37,10 @@ pub fn get<'a, 'b>(
 ) -> Result<Box<dyn ChooserPlugin + 'b>, String> {
     let chooser: Box<dyn ChooserPlugin> = match name {
         rotate::NAME => init_plugin!(rotate::RotateChooserPlugin::new(&config.info.bands, props)),
+        schedule::NAME => init_plugin!(schedule::ScheduleChooserPlugin::new(
+            &config.info.bands,
+            props
+        )),
         single::NAME => init_plugin!(single::SingleChooserPlugin::new(&config.info.bands, props)),
         tracker::NAME => init_plugin!(tracker::TrackerChooserPlugin::new(config, props, gs_info)),
         _ => return Err(format!("{} is not a valid chooser plugin", name)),
