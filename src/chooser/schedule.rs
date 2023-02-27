@@ -64,7 +64,6 @@ impl<'a> ScheduleChooserPlugin<'a> {
 
         Ok(ScheduleChooserPlugin {
             bands,
-            props,
             triggers,
             current_band: 0,
         })
