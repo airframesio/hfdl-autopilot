@@ -44,23 +44,23 @@ impl<'a> RotateChooserPlugin<'a> {
 
         let mut triggers: Vec<(u8, u8, u32)> = vec![];
 
-        for (freq, t) in prefer.split("/").map(|x| {
-            let trigger: Vec<&str> = x.split("@").collect();
-            (trigger[0], trigger[1])
-        }) {
-            let time: Vec<&str> = t.split(":").collect();
-            if time.len() != 2 {
-                continue;
-            }
+        for stanza in prefer.split("/") {
+            let trigger: Vec<&str> = stanza.split("@").collect();
+            if trigger.len() == 2 {
+                let time: Vec<&str> = trigger[1].split(":").collect();
+                if time.len() != 2 {
+                    continue;
+                }
 
-            let (h, m) = match parse_time(&time) {
-                Some(val) => val,
-                None => continue,
-            };
+                let (h, m) = match parse_time(&time) {
+                    Some(val) => val,
+                    None => continue,
+                };
 
-            let band: u32 = freq.parse().unwrap_or(0);
-            if bands.contains_key(&band) && !triggers.iter().any(|x| x.0 == h && x.1 == m) {
-                triggers.push((h, m, band))
+                let band: u32 = trigger[0].parse().unwrap_or(0);
+                if bands.contains_key(&band) && !triggers.iter().any(|x| x.0 == h && x.1 == m) {
+                    triggers.push((h, m, band))
+                }
             }
         }
 
