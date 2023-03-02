@@ -66,19 +66,21 @@ impl<'a> RotateChooserPlugin<'a> {
 
         triggers.sort_unstable();
 
-        if start_band == 0 {
-            if !triggers.is_empty() {
-                if let Some(band) = get_band(&triggers) {
+        let mut last_prefer = 0;
+
+        if !triggers.is_empty() {
+            if let Some(band) = get_band(&triggers) {
+                last_prefer = band;
+
+                if start_band == 0 {
                     start_band = band;
                 }
             }
-
-            if start_band == 0 {
-                start_band = 13;
-            }
         }
 
-        let last_prefer = start_band;
+        if start_band == 0 {
+            start_band = 13;
+        }
 
         info!(
             "Rotate settings: start={} switcher={} ignore_last={} prefer={:?}",
@@ -116,22 +118,24 @@ impl<'a> RotateChooserPlugin<'a> {
     }
 
     fn determine_preferred_band_change(&mut self) -> bool {
-        let band = get_band(&self.triggers).unwrap_or(0);
+        if !self.triggers.is_empty() {
+            let band = get_band(&self.triggers).unwrap_or(0);
 
-        if band != 0 && band != self.last_prefer {
-            self.last_prefer = band;
-            self.init_band_idx = self.band_keys.iter().position(|&x| *x == band).unwrap_or(0);
-            self.band_idx = None;
+            if band != 0 && band != self.last_prefer {
+                self.last_prefer = band;
+                self.init_band_idx = self.band_keys.iter().position(|&x| *x == band).unwrap_or(0);
+                self.band_idx = None;
 
-            if let Some(idx) = self
-                .recently_used
-                .iter()
-                .position(|&x| x == self.init_band_idx)
-            {
-                self.recently_used.remove(idx);
+                if let Some(idx) = self
+                    .recently_used
+                    .iter()
+                    .position(|&x| x == self.init_band_idx)
+                {
+                    self.recently_used.remove(idx);
+                }
+
+                return true;
             }
-
-            return true;
         }
 
         false
