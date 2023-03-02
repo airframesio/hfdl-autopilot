@@ -18,6 +18,7 @@ mod config;
 mod hfdl;
 mod http;
 mod state;
+mod utils;
 
 #[tokio::main]
 async fn main() -> io::Result<()> {

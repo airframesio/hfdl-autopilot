@@ -1,6 +1,6 @@
 use crate::chooser::ChooserPlugin;
 use crate::config::FrequencyBandMap;
-use chrono::Timelike;
+use crate::utils::{get_band, parse_time};
 use log::*;
 use std::collections::HashMap;
 
@@ -11,17 +11,6 @@ pub struct ScheduleChooserPlugin<'a> {
 
     triggers: Vec<(u8, u8, u32)>,
     current_band: u32,
-}
-
-fn parse_time(raw_time: &Vec<&str>) -> Option<(u8, u8)> {
-    let h: u8 = raw_time[0].parse().unwrap_or(255);
-    let m: u8 = raw_time[1].parse().unwrap_or(255);
-
-    if h > 23 || m >= 60 {
-        return None;
-    }
-
-    Some((h, m))
 }
 
 impl<'a> ScheduleChooserPlugin<'a> {
@@ -68,23 +57,11 @@ impl<'a> ScheduleChooserPlugin<'a> {
             current_band: 0,
         })
     }
-
-    fn get_band(&self) -> Option<u32> {
-        let current_time = chrono::offset::Local::now();
-
-        for (h, m, band) in self.triggers.iter() {
-            if current_time.hour() >= (*h as u32) && current_time.minute() >= (*m as u32) {
-                return Some(*band);
-            }
-        }
-
-        self.triggers.last().map(|x| x.2)
-    }
 }
 
 impl<'a> ChooserPlugin for ScheduleChooserPlugin<'a> {
     fn choose(&mut self) -> Result<&'a Vec<u32>, String> {
-        let band = match self.get_band() {
+        let band = match get_band(&self.triggers) {
             Some(val) => val,
             None => {
                 return Err(format!(
@@ -101,7 +78,7 @@ impl<'a> ChooserPlugin for ScheduleChooserPlugin<'a> {
     }
 
     fn on_recv_frame(&mut self, _frame: &serde_json::Value) -> bool {
-        let band = self.get_band().unwrap_or(0);
+        let band = get_band(&self.triggers).unwrap_or(0);
         band != 0 && self.current_band != band
     }
 

@@ -1,3 +1,4 @@
+use crate::utils::{get_band, parse_time};
 use crate::{chooser::ChooserPlugin, config::FrequencyBandMap};
 use log::*;
 use rand::rngs::ThreadRng;
@@ -19,6 +20,9 @@ pub struct RotateChooserPlugin<'a> {
     init_band_idx: usize,
 
     band_idx: Option<usize>,
+
+    last_prefer: u32,
+    triggers: Vec<(u8, u8, u32)>,
 }
 
 impl<'a> RotateChooserPlugin<'a> {
@@ -29,22 +33,66 @@ impl<'a> RotateChooserPlugin<'a> {
         let mut band_keys: Vec<&u32> = bands.keys().into_iter().collect();
         band_keys.sort_unstable();
 
-        let start_band: u32 = props.get("start").unwrap_or(&"13").parse().unwrap_or(13);
-        let init_band_idx = band_keys
-            .iter()
-            .position(|&&x| x == start_band)
-            .unwrap_or(0);
+        let mut start_band: u32 = props.get("start").unwrap_or(&"13").parse().unwrap_or(0);
         let ignore_last = props
             .get("ignore_last")
             .unwrap_or(&"DEFAULT")
             .parse()
             .unwrap_or(8);
         let switcher = *props.get("type").unwrap_or(&"inc");
+        let prefer = *props.get("prefer").unwrap_or(&"");
+
+        let mut triggers: Vec<(u8, u8, u32)> = vec![];
+
+        for (freq, t) in prefer.split("/").map(|x| {
+            let trigger: Vec<&str> = x.split("@").collect();
+            (trigger[0], trigger[1])
+        }) {
+            let time: Vec<&str> = t.split(":").collect();
+            if time.len() != 2 {
+                continue;
+            }
+
+            let (h, m) = match parse_time(&time) {
+                Some(val) => val,
+                None => continue,
+            };
+
+            let band: u32 = freq.parse().unwrap_or(0);
+            if bands.contains_key(&band) && !triggers.iter().any(|x| x.0 == h && x.1 == m) {
+                triggers.push((h, m, band))
+            }
+        }
+
+        if start_band == 0 {
+            if !triggers.is_empty() {
+                if let Some(band) = get_band(&triggers) {
+                    start_band = band;
+                }
+            }
+
+            if start_band == 0 {
+                start_band = 13;
+            }
+        }
+
+        let last_prefer = start_band;
 
         info!(
-            "Rotate settings: start={} switcher={} ignore_last={}",
-            start_band, switcher, ignore_last
+            "Rotate settings: start={} switcher={} ignore_last={} prefer={:?}",
+            start_band,
+            switcher,
+            ignore_last,
+            triggers
+                .iter()
+                .map(|x| format!("{:02}:{:02} => {}", x.0, x.1, x.2))
+                .collect::<Vec<String>>()
         );
+
+        let init_band_idx = band_keys
+            .iter()
+            .position(|&&x| x == start_band)
+            .unwrap_or(0);
 
         Ok(RotateChooserPlugin {
             bands,
@@ -59,7 +107,32 @@ impl<'a> RotateChooserPlugin<'a> {
             init_band_idx,
 
             band_idx: None,
+
+            triggers,
+            last_prefer,
         })
+    }
+
+    fn determine_preferred_band_change(&mut self) -> bool {
+        let band = get_band(&self.triggers).unwrap_or(0);
+
+        if band != 0 && band != self.last_prefer {
+            self.last_prefer = band;
+            self.init_band_idx = self.band_keys.iter().position(|&x| *x == band).unwrap_or(0);
+            self.band_idx = None;
+
+            if let Some(idx) = self
+                .recently_used
+                .iter()
+                .position(|&x| x == self.init_band_idx)
+            {
+                self.recently_used.remove(idx);
+            }
+
+            return true;
+        }
+
+        false
     }
 }
 
@@ -107,10 +180,12 @@ impl<'a> ChooserPlugin for RotateChooserPlugin<'a> {
     }
 
     fn on_recv_frame(&mut self, _frame: &serde_json::Value) -> bool {
-        false
+        self.determine_preferred_band_change()
     }
 
     fn on_timeout(&mut self) -> bool {
+        self.determine_preferred_band_change();
+
         true
     }
 }
