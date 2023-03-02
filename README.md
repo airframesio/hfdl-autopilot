@@ -48,7 +48,7 @@ Valid `type`s:
 * `dec` - on timeout, move on to the next lowest band; if already on the lowest band, move to the highest in the list
 * `random` - on timeout, choose a random band that we haven't visited in the last 6 sessions
 ```
---chooser rotate:type=random,start=21,ignore_last=8
+--chooser rotate:type=random,start=21,ignore_last=8,prefer=21@7:00/10@19:00
 ```
 #### `tracker`
 Track messages to/from a specific ground station. Move on to a new band if inactivity timeout occurs or we haven't heard a message to/from target for `timeout` seconds.
