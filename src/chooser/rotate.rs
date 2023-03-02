@@ -33,7 +33,7 @@ impl<'a> RotateChooserPlugin<'a> {
         let mut band_keys: Vec<&u32> = bands.keys().into_iter().collect();
         band_keys.sort_unstable();
 
-        let mut start_band: u32 = props.get("start").unwrap_or(&"13").parse().unwrap_or(0);
+        let mut start_band: u32 = props.get("start").unwrap_or(&"0").parse().unwrap_or(0);
         let ignore_last = props
             .get("ignore_last")
             .unwrap_or(&"DEFAULT")
@@ -63,6 +63,8 @@ impl<'a> RotateChooserPlugin<'a> {
                 }
             }
         }
+
+        triggers.sort_unstable();
 
         if start_band == 0 {
             if !triggers.is_empty() {
