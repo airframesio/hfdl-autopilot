@@ -185,6 +185,8 @@ async fn main() -> io::Result<()> {
                 match results {
                     Ok(size) => {
                         if size == 0 {
+                            // TODO: look at stderr?
+
                             error!("Read error: encountered 0 sized read from dumphfdl! (attempt {} of {})", bad_child_reads + 1, config.max_bad_child_reads);
                             bad_child_reads += 1;
                             break;
