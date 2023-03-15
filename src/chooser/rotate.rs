@@ -64,7 +64,7 @@ impl<'a> RotateChooserPlugin<'a> {
             }
         }
 
-        triggers.sort_unstable();
+        triggers.sort_unstable_by(|a, b| a.0.cmp(&b.0));
 
         let mut last_prefer = 0;
 
