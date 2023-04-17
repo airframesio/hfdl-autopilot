@@ -1,33 +1,40 @@
-use crate::state::SharedState;
-use actix_web::{rt, web, App, HttpServer};
 use clap::Parser;
 use log::*;
 use serde_json::Value;
+use std::env;
 use std::io;
-use std::io::{Seek, SeekFrom, Write};
+use std::process;
 use std::process::Stdio;
-use std::time::{Duration, Instant};
-use tempfile::NamedTempFile;
+use std::time::Duration;
 use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio::process::Command;
 use tokio::time;
+use tokio::time::Instant;
+use utils::arguments::Args;
 
-mod args;
-mod chooser;
-mod config;
-mod hfdl;
-mod http;
-mod state;
+mod autopilot;
 mod utils;
 
 #[tokio::main]
 async fn main() -> io::Result<()> {
-    let args = args::Args::parse();
+    let args = Args::parse();
+
+    let verbose_level = match env::var("HFDLAP_DEBUG") {
+        Ok(val) => {
+            let norm = val.trim().to_lowercase();
+            if norm.starts_with("t") || norm.starts_with("y") || norm.eq("1") {
+                3
+            } else {
+                2
+            }
+        }
+        Err(_) => 2,
+    };
 
     stderrlog::new()
         .module(module_path!())
         .quiet(args.quiet)
-        .verbosity(if args.verbose { 3 } else { 1 })
+        .verbosity(if args.verbose { verbose_level } else { 1 })
         .timestamp(if args.verbose {
             stderrlog::Timestamp::Second
         } else {
@@ -36,227 +43,251 @@ async fn main() -> io::Result<()> {
         .init()
         .unwrap();
 
-    let config = match config::Config::from_args(&args) {
-        Ok(cfg) => cfg,
-        Err(e) => {
-            error!("Failed to parse configuration: {}", e);
-            return Ok(());
-        }
-    };
-    info!("Configuration demarshalled from command line arguments.");
-    info!("  {}", config);
-
-    let (name, props) = args.chooser_params();
-    info!("Chooser plugin name={} props={:?}", name, props);
-
-    let mut shared_state = SharedState::new(&config);
-
-    let mut plugin = match chooser::get(name, &config, &props, shared_state.gs_info.clone()) {
-        Ok(plugin) => plugin,
-        Err(e) => {
-            error!("PLUGIN INIT[{}]: {}", name, e);
-            return Ok(());
-        }
-    };
-
-    if config.swarm {
-        info!("Swarm mode is ON: target={}:{}", config.host, config.port);
-        error!("UNSUPPORTED for now...");
-
-        // TODO: what does swarm mode look like
-    } else {
-        info!(
-            "Swarm mode is OFF: starting web server on {}:{}",
-            config.host, config.port
-        );
-
-        let session = shared_state.session.clone();
-        let gs_info = shared_state.gs_info.clone();
-        let gs_stats = shared_state.gs_stats.clone();
-        let flight_posrpt = shared_state.flight_posrpt.clone();
-        let freq_stats = shared_state.freq_stats.clone();
-
-        let server_host = config.host.clone();
-        let server_port = config.port;
-
-        tokio::spawn(async move {
-            let server = HttpServer::new(move || {
-                App::new()
-                    .app_data(session.clone())
-                    .app_data(gs_info.clone())
-                    .app_data(gs_stats.clone())
-                    .app_data(flight_posrpt.clone())
-                    .app_data(freq_stats.clone())
-                    .route("/", web::get().to(http::web_index))
-                    .route("/api/session", web::get().to(http::api_session_list))
-                    .route("/api/ground-stations", web::get().to(http::api_gs_list))
-                    .route(
-                        "/api/ground-station/stats",
-                        web::get().to(http::api_gs_stats),
-                    )
-                    .route("/api/freq-stats", web::get().to(http::api_freq_stats))
-                    .route("/api/flights", web::get().to(http::api_flights_list))
-                    .route(
-                        "/api/flight/{callsign}",
-                        web::get().to(http::api_flights_detail),
-                    )
-            })
-            .bind((server_host, server_port))
-            .unwrap()
-            .run();
-            server.await
-        });
+    if !args.bin.exists() {
+        error!("Cannot find {}", args.bin.to_string_lossy());
+        error!("Verify that dumphfdl exists in the path above and try again.");
+        process::exit(1);
     }
 
-    let mut systable = NamedTempFile::new()?;
-    write!(systable, "{}", config.info.raw)?;
-    systable.seek(SeekFrom::Start(0))?;
+    if !args.systable.exists() {
+        error!("Cannot find {}", args.systable.to_string_lossy());
+        error!("Verify that the systable configuration exists in the path above and try again.");
+        process::exit(1);
+    }
 
-    let systable_temp_path = systable.into_temp_path();
-    let timeout = Duration::from_secs(config.timeout as u64);
-
-    info!(
-        "System Table information written to {:?}",
-        systable_temp_path
-    );
-    info!("Starting listening session...");
-    info!("");
-
-    let mut bad_child_reads = 0;
-
-    while bad_child_reads < config.max_bad_child_reads {
-        let band = match plugin.choose() {
-            Ok(val) => val.to_owned(),
+    let dumphfdl_args = if args.enable_feed_airframes {
+        match utils::airframes::add_airframes_feeder_args(&args.hfdl_args) {
+            Ok(p) => p,
             Err(e) => {
-                error!("Failed to choose a frequency band to listen to: {}", e);
-                return Ok(());
+                error!(
+                    "Error occurred when trying to enable airframes.io feeding: {}",
+                    e.to_string()
+                );
+                error!("Make sure to add '--station-id' argument with a station name to the dumphfdl addition args, then try again.");
+                process::exit(1)
+            }
+        }
+    } else {
+        args.hfdl_args.clone()
+    };
+
+    let (name, props) = args.chooser_config();
+
+    let sampling_rates = match args.soapysdr_sample_rates() {
+        Ok(r) => r,
+        Err(e) => {
+            error!(
+                "Failed to determine valid SDR sampling rates: {}",
+                e.to_string()
+            );
+            error!("Make sure '--soapysdr' argument is provided in additional arguments and try again.");
+            process::exit(1)
+        }
+    };
+    info!("supported sampling rates = {:?}", sampling_rates);
+
+    let state = match autopilot::state::OpsState::init(
+        &args.systable,
+        args.max_bandwidth,
+        sampling_rates,
+        name,
+        &props,
+    ) {
+        Ok(s) => s,
+        Err(e) => {
+            error!("Failed to initialize state: {}", e.to_string());
+            error!("Check to make sure systable configuration path, max bandwidth value, and chooser plugin+arguments are valid and try again.");
+            process::exit(1)
+        }
+    };
+    info!("hfdl-autopilot settings");
+    info!("  systable path = {}", args.systable.to_string_lossy());
+    info!("  dumphfdl path = {}", args.bin.to_string_lossy());
+    info!("  init max_bandwith = {}", args.max_bandwidth);
+
+    if args.verbose && verbose_level == 3 {
+        debug!("  hfdl freq bands");
+        for (k, v) in &state.bands {
+            debug!("    band {}: {:?}", k, v);
+        }
+    }
+
+    info!("  init plugin name = {}, props = {:?}", name, props);
+
+    let settings = autopilot::settings::Settings {
+        use_airframes_live_gs: args.use_airframes_live_gs,
+        stale_timeout_seconds: args.stale_timeout,
+        session_break_seconds: args.session_break,
+        session_timeout_seconds: args.session_timeout,
+    };
+    info!(
+        "  enable_airframes_feeding = {}",
+        args.enable_feed_airframes
+    );
+    info!(
+        "  use_airframes_live_gs    = {}",
+        args.use_airframes_live_gs
+    );
+    info!("  stale_timeout_seconds    = {}", args.stale_timeout);
+    info!("  session_break_seconds    = {}", args.session_break);
+    info!("  session_timeout_seconds  = {}", args.session_timeout);
+
+    let mut app = autopilot::Autopilot::new(settings, state);
+
+    if let Some(ref swarm_url) = args.swarm {
+        app.enable_swarm(swarm_url);
+        info!("enabling swarm with server at {}", swarm_url.to_string());
+    } else {
+        app.enable_api_server(
+            &args.host,
+            args.port,
+            &args.token,
+            args.disable_cors,
+            args.disable_api_control,
+        );
+        info!(
+            "enabling API server at http://{}:{}, use auth = {}, cors = {}, api_control = {}",
+            args.host,
+            args.port,
+            !args.token.is_empty(),
+            !args.disable_cors,
+            !args.disable_api_control
+        );
+    }
+
+    while app.should_run() {
+        let (freqs, sampling_rate) = match app.choose_listening_freqs() {
+            Ok((f, r)) => (f, r),
+            Err(e) => {
+                error!(
+                    "Failed to choose next listening frequencies: {}",
+                    e.to_string()
+                );
+                process::exit(1)
             }
         };
 
-        shared_state.update_current_band(&band);
-
-        let bandwidth = match band.iter().max().unwrap_or(&0) - band.iter().min().unwrap_or(&0) {
-            d if d >= 452 && d < 764 => "768000",
-            d if d >= 380 && d < 452 => "456000",
-            d if d > 252 && d < 380 => "384000",
-            d if d <= 252 => "256000",
-            _ => {
-                error!("Bandwidth calculation failed: {:?}", band);
-                return Ok(());
-            }
-        };
-
-        info!("NEW SESSION: sample_rate={} band={:?}", bandwidth, band);
-
-        let mut proc = match Command::new(config.bin.clone())
+        let mut proc = match Command::new(&args.bin)
             .stdout(Stdio::piped())
-            .stderr(Stdio::null())
+            .stderr(Stdio::piped())
             .arg("--system-table")
-            .arg(systable_temp_path.to_path_buf())
+            .arg(&args.systable)
             .arg("--sample-rate")
-            .arg(bandwidth)
+            .arg(sampling_rate.to_string())
             .arg("--output")
             .arg("decoded:json:file:path=-")
-            .args(config.additional_args.clone())
-            .args(band.into_iter().map(|f| f.to_string()))
+            .args(&dumphfdl_args)
+            .args(freqs.into_iter().map(|f| f.to_string()))
             .spawn()
         {
-            Ok(proc) => proc,
+            Ok(p) => p,
             Err(e) => {
-                error!("Failed to start dumphfdl: {}", e);
+                error!("Failed to start dumphfdl: {}", e.to_string());
                 continue;
             }
         };
 
         let child_stdout = match proc.stdout.take() {
-            Some(stdout) => stdout,
+            Some(o) => o,
             None => {
-                error!("Unable to get STDOUT for child dumphfdl process!");
+                error!("Unable to take STDOUT for child dumphfdl process");
                 continue;
             }
         };
-        let mut reader = BufReader::new(child_stdout);
-        let mut last_cleanup = Instant::now();
+        let child_stderr = match proc.stderr.take() {
+            Some(e) => e,
+            None => {
+                error!("Unable to take STDERR for child dumphfdl process");
+                continue;
+            }
+        };
+
+        let mut stdout_reader = BufReader::new(child_stdout);
+        let mut stderr_reader = BufReader::new(child_stderr);
+
+        let mut since_last_frame = Instant::now();
+        let mut since_last_cleanup = Instant::now();
 
         loop {
             let mut msg = String::new();
 
-            if let Ok(results) = rt::time::timeout(timeout, reader.read_line(&mut msg)).await {
+            if let Ok(results) = time::timeout(
+                Duration::from_millis(1000),
+                stdout_reader.read_line(&mut msg),
+            )
+            .await
+            {
                 match results {
                     Ok(size) => {
                         if size == 0 {
-                            // TODO: look at stderr?
+                            // TODO: read stderr?
 
-                            error!("Read error: encountered 0 sized read from dumphfdl! (attempt {} of {})", bad_child_reads + 1, config.max_bad_child_reads);
-                            bad_child_reads += 1;
                             break;
+                        }
+
+                        let stale_timeout_secs: u64;
+                        {
+                            let settings = app.settings.read().unwrap();
+                            stale_timeout_secs = settings.stale_timeout_seconds as u64;
                         }
 
                         let frame: Value = match serde_json::from_str(&msg) {
-                            Ok(val) => val,
+                            Ok(f) => f,
                             Err(e) => {
-                                error!("Bad JSON decode: {}", e);
+                                error!("HFDL frame is not valid JSON: {}", e.to_string());
                                 continue;
                             }
                         };
+                        since_last_frame = Instant::now();
 
-                        println!("{}", msg.trim());
+                        if !args.disable_stdout {
+                            println!("{}", msg.trim());
+                        }
 
-                        shared_state.update(&frame);
-
-                        if plugin.on_recv_frame(&frame) {
-                            info!("{} elects to change bands after last HFDL frame.", name);
+                        if app.on_frame(&frame) {
+                            info!("NAME elects to change bands after last HFDL frame");
                             break;
                         }
 
-                        if last_cleanup.elapsed().as_secs() >= config.ac_timeout {
-                            shared_state.clean_up();
-                            last_cleanup = Instant::now();
+                        let since_last_cleanup_secs = since_last_cleanup.elapsed().as_secs();
+                        if since_last_cleanup_secs >= stale_timeout_secs {
+                            // TODO: better info message for cleanup
+                            info!("");
+                            app.cleanup();
+                            since_last_cleanup = Instant::now();
                         }
                     }
                     Err(e) => {
-                        error!(
-                            "Read error: {} (attempt {} of {})",
-                            e,
-                            bad_child_reads + 1,
-                            config.max_bad_child_reads
-                        );
+                        // TODO: we almost never run into this...
 
-                        bad_child_reads += 1;
                         break;
                     }
                 }
-            } else if plugin.on_timeout() {
-                info!(
-                    "Been {}s since last message on band. {} elects to change bands.",
-                    config.timeout, name
-                );
-                break;
+            } else {
+                // TODO: get plugin name
+
+                let session_timeout_seconds: u64;
+                {
+                    let settings = app.settings.read().unwrap();
+                    session_timeout_seconds = settings.stale_timeout_seconds as u64;
+                }
+
+                let since_last_frame_secs = since_last_frame.elapsed().as_secs();
+                if since_last_frame_secs > session_timeout_seconds && app.on_timeout() {
+                    info!(
+                        "been {} seconds since last HFDL frame heard, NAME elects to change bands",
+                        since_last_frame_secs
+                    );
+                    break;
+                }
+
+                if app.should_change() {
+                    // TODO: display better info message here
+                    info!("");
+                    break;
+                }
             }
         }
-
-        proc.kill().await?;
-
-        if bad_child_reads < config.max_bad_child_reads && config.end_session_wait > 0 {
-            info!(
-                "Waiting {} seconds before starting new session",
-                config.end_session_wait
-            );
-            time::sleep(Duration::from_secs(config.end_session_wait)).await;
-        }
-
-        info!("Ending session...");
-
-        shared_state.clean_up();
-
-        info!("");
-    }
-
-    if bad_child_reads > 0 {
-        error!("Encountered read errors from dumphfdl: process may be prematurely exiting");
-        error!(
-            "Verify that dumphfdl is being fed with correct arguments and can be run indepedently"
-        );
     }
 
     Ok(())
